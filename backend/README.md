@@ -140,9 +140,9 @@ The simulator advances a multi-stage flood emergency scenario using real backend
 ### Stage Rainfall & Risk Outputs
 | Region | Vulnerability | Stage 2 Rainfall | Stage 2 Risk | Stage 3 Rainfall | Stage 3 Risk | Stage 3 Flooded? |
 |---|---|---|---|---|---|---|
-| **Zone A - Riverside** | `0.9` | 90 mm (adj. 126 mm) | **SEVERE** | 110 mm (adj. 154 mm) | **SEVERE** | **Yes** |
-| **Zone B - Central Lowlands** | `0.6` | 70 mm (adj. 77 mm) | **HIGH** | 85 mm (adj. 93.5 mm) | **HIGH** | **Yes** |
-| **Zone C - Eastern Uplands** | `0.3` | 40 mm (adj. 32 mm) | **MODERATE** | 50 mm (adj. 40 mm) | **MODERATE** | No |
+| **Zone A - Bharalumukh** | `0.9` | 90 mm (adj. 126 mm) | **SEVERE** | 110 mm (adj. 154 mm) | **SEVERE** | **Yes** |
+| **Zone B - Beltola** | `0.6` | 70 mm (adj. 77 mm) | **HIGH** | 85 mm (adj. 93.5 mm) | **HIGH** | **Yes** |
+| **Zone C - Noonmati** | `0.3` | 40 mm (adj. 32 mm) | **MODERATE** | 50 mm (adj. 40 mm) | **MODERATE** | No |
 
 ### Speed & Offline Mode (`LLM_ENABLED`)
 - Setting `LLM_ENABLED=false` in `.env` makes Stage 2 advance offline, fast (~0.15s), and deterministic using template alert text.

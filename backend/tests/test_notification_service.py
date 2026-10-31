@@ -27,7 +27,7 @@ def test_moderate_report_auto_sent_and_appears_in_citizen_feed(
     """
     client, session = client_and_session
     now = datetime.now(timezone.utc)
-    region_b = session.exec(select(Region).where(Region.name == "Zone B - Central Lowlands")).first()
+    region_b = session.exec(select(Region).where(Region.name == "Zone B - Beltola")).first()
     assert region_b is not None
 
     report = RiskReport(
@@ -72,7 +72,7 @@ def test_high_report_creates_pending_draft(
     """Verify HIGH report creates a draft requiring approval: not in GET /alerts, present in GET /alerts/pending."""
     client, session = client_and_session
     now = datetime.now(timezone.utc)
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     report = RiskReport(
@@ -107,7 +107,7 @@ def test_alert_deduplication_and_superseding(
     """Verify deduplication ignores equal/lower reports and higher severity supersedes lower draft."""
     client, session = client_and_session
     now = datetime.now(timezone.utc)
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     high_report = RiskReport(
@@ -157,7 +157,7 @@ def test_approve_alert_workflow_and_errors(
     """Verify approval transitions status to 'sent', dispatches deliveries, and handles 409/422."""
     client, session = client_and_session
     now = datetime.now(timezone.utc)
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     report = RiskReport(
@@ -184,7 +184,7 @@ def test_approve_alert_workflow_and_errors(
     # 2. Successful approval with valid edited message
     valid_edit = (
         "Flood warning for Zone A: 80 mm rainfall expected. "
-        "Move belongings to higher ground. Nearest depot: Warehouse A - North Depot, 3.3 km."
+        "Move belongings to higher ground. Nearest depot: Warehouse A - Fancy Bazaar, 3.3 km."
     )
     approve_resp = client.post(
         f"/alerts/{draft.id}/approve",

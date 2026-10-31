@@ -34,22 +34,22 @@ def session_fixture() -> Generator[Session, None, None]:
 
 def test_nearest_warehouse_picks_closest(session: Session) -> None:
     """Verify haversine distance correctly identifies nearest warehouse to region center."""
-    # Zone A center: (26.18, 91.74). Warehouse A is at (26.21, 91.74), distance ~3.3 km
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    # Zone A center: (26.166952, 91.755809). Warehouse A is at (26.177680, 91.734750), distance ~2.4 km
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     closest, distance_km = nearest_warehouse(session, region_a)
-    assert closest.name == "Warehouse A - North Depot"
-    assert 3.0 <= distance_km <= 4.0
+    assert closest.name == "Warehouse A - Fancy Bazaar"
+    assert 2.0 <= distance_km <= 3.0
 
 
 def test_templates_pass_strict_validation() -> None:
     """Verify all built-in alert templates satisfy length, region name, and number constraints."""
     facts = {
-        "region": "Zone A - Riverside",
+        "region": "Zone A - Bharalumukh",
         "alert_level_label": "Warning",
         "rainfall_mm": 70,
-        "nearest_warehouse": "Warehouse A - North Depot",
+        "nearest_warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 3.3,
     }
 
@@ -69,16 +69,16 @@ def test_draft_message_uses_valid_llm_output(
 ) -> None:
     """Verify that compliant LLM-generated output is selected over template."""
     facts = {
-        "region": "Zone A - Riverside",
+        "region": "Zone A - Bharalumukh",
         "alert_level_label": "Warning",
         "rainfall_mm": 70,
-        "nearest_warehouse": "Warehouse A - North Depot",
+        "nearest_warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 3.3,
     }
 
     valid_llm_text = (
         "Flood warning for Zone A: 70 mm of heavy rain expected. "
-        "Move belongings to higher ground. Nearest relief point: Warehouse A - North Depot, 3.3 km."
+        "Move belongings to higher ground. Nearest relief point: Warehouse A - Fancy Bazaar, 3.3 km."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -96,17 +96,17 @@ def test_draft_message_falls_back_on_wrong_number(
 ) -> None:
     """Verify fallback to template when LLM text introduces unverified numbers."""
     facts = {
-        "region": "Zone A - Riverside",
+        "region": "Zone A - Bharalumukh",
         "alert_level_label": "Warning",
         "rainfall_mm": 70,
-        "nearest_warehouse": "Warehouse A - North Depot",
+        "nearest_warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 3.3,
     }
 
     # "in 2 hours" introduces unverified number '2'
     hallucinated_number_text = (
         "Flood warning for Zone A: 70 mm of rain arriving in 2 hours. "
-        "Relief point Warehouse A - North Depot is 3.3 km away."
+        "Relief point Warehouse A - Fancy Bazaar is 3.3 km away."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -125,15 +125,15 @@ def test_draft_message_falls_back_on_missing_region_or_excess_length(
 ) -> None:
     """Verify fallback to template when LLM omits region name or exceeds length."""
     facts = {
-        "region": "Zone A - Riverside",
+        "region": "Zone A - Bharalumukh",
         "alert_level_label": "Urgent warning",
         "rainfall_mm": 120,
-        "nearest_warehouse": "Warehouse A - North Depot",
+        "nearest_warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 3.3,
     }
 
     # Missing region name
-    no_region_text = "Urgent warning: 120 mm rain. Evacuate to Warehouse A - North Depot, 3.3 km away."
+    no_region_text = "Urgent warning: 120 mm rain. Evacuate to Warehouse A - Fancy Bazaar, 3.3 km away."
     monkeypatch.setattr(
         alert_drafting,
         "generate_json",
@@ -142,10 +142,10 @@ def test_draft_message_falls_back_on_missing_region_or_excess_length(
 
     message, used_llm = draft_alert_message(session, facts, AlertLevel.URGENT)
     assert used_llm is False
-    assert "Zone A - Riverside" in message
+    assert "Zone A - Bharalumukh" in message
 
     # Exceeding 320 characters
-    long_text = "URGENT flood warning for Zone A - Riverside: " + ("heavy rain " * 35) + " 120 mm."
+    long_text = "URGENT flood warning for Zone A - Bharalumukh: " + ("heavy rain " * 35) + " 120 mm."
     monkeypatch.setattr(
         alert_drafting,
         "generate_json",
@@ -161,10 +161,10 @@ def test_draft_message_falls_back_when_llm_returns_none(
 ) -> None:
     """Verify fallback when LLM is disabled or returns None."""
     facts = {
-        "region": "Zone B - Central Lowlands",
+        "region": "Zone B - Beltola",
         "alert_level_label": "Advisory",
         "rainfall_mm": 35,
-        "nearest_warehouse": "Warehouse B - Central Depot",
+        "nearest_warehouse": "Warehouse B - Khanapara",
         "distance_km": 3.3,
     }
 
@@ -172,7 +172,7 @@ def test_draft_message_falls_back_when_llm_returns_none(
 
     message, used_llm = draft_alert_message(session, facts, AlertLevel.ADVISORY)
     assert used_llm is False
-    assert "Zone B - Central Lowlands" in message
+    assert "Zone B - Beltola" in message
     assert "about 35 mm" in message
 
 
@@ -181,16 +181,16 @@ def test_draft_message_urgent_rejects_stay_indoors_and_falls_back(
 ) -> None:
     """Verify that URGENT alert rejects stay-in-place phrasing ('stay indoors') and falls back."""
     facts = {
-        "region": "Zone A - Riverside",
+        "region": "Zone A - Bharalumukh",
         "alert_level_label": "Urgent warning",
         "rainfall_mm": 90,
-        "nearest_warehouse": "Warehouse A - North Depot",
+        "nearest_warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 3.3,
     }
 
     bad_text = (
         "URGENT warning for Zone A: 90 mm rain expected. Please stay indoors and move to higher ground. "
-        "Depot: Warehouse A - North Depot is 3.3 km."
+        "Depot: Warehouse A - Fancy Bazaar is 3.3 km."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -200,7 +200,7 @@ def test_draft_message_urgent_rejects_stay_indoors_and_falls_back(
 
     message, used_llm = draft_alert_message(session, facts, AlertLevel.URGENT)
     assert used_llm is False
-    assert "URGENT flood warning for Zone A - Riverside" in message
+    assert "URGENT flood warning for Zone A - Bharalumukh" in message
 
 
 def test_draft_message_urgent_requires_higher_ground(
@@ -208,16 +208,16 @@ def test_draft_message_urgent_requires_higher_ground(
 ) -> None:
     """Verify that URGENT alert without 'higher ground' is rejected and falls back."""
     facts = {
-        "region": "Zone A - Riverside",
+        "region": "Zone A - Bharalumukh",
         "alert_level_label": "Urgent warning",
         "rainfall_mm": 90,
-        "nearest_warehouse": "Warehouse A - North Depot",
+        "nearest_warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 3.3,
     }
 
     no_higher_ground = (
         "URGENT warning for Zone A: 90 mm rain expected. Stay away from flooded roads. "
-        "Depot: Warehouse A - North Depot is 3.3 km."
+        "Depot: Warehouse A - Fancy Bazaar is 3.3 km."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -235,16 +235,16 @@ def test_draft_message_advisory_allows_stay_indoors(
 ) -> None:
     """Verify that ADVISORY messages are NOT rejected by the stay-in-place rule."""
     facts = {
-        "region": "Zone C - Eastern Uplands",
+        "region": "Zone C - Noonmati",
         "alert_level_label": "Advisory",
         "rainfall_mm": 40,
-        "nearest_warehouse": "Warehouse C - East Depot",
+        "nearest_warehouse": "Warehouse C - Noonmati",
         "distance_km": 2.5,
     }
 
     advisory_with_stay_indoors = (
         "Advisory for Zone C: 40 mm rain forecast. Stay indoors if possible and avoid low-lying areas. "
-        "Depot: Warehouse C - East Depot is 2.5 km away."
+        "Depot: Warehouse C - Noonmati is 2.5 km away."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -262,16 +262,16 @@ def test_draft_message_warning_rejects_stay_in_place(
 ) -> None:
     """Verify that WARNING messages reject stay-in-place phrasing ('shelter in place')."""
     facts = {
-        "region": "Zone B - Central Lowlands",
+        "region": "Zone B - Beltola",
         "alert_level_label": "Warning",
         "rainfall_mm": 70,
-        "nearest_warehouse": "Warehouse B - Central Depot",
+        "nearest_warehouse": "Warehouse B - Khanapara",
         "distance_km": 3.3,
     }
 
     warning_with_shelter = (
         "Flood warning for Zone B: 70 mm rain expected. Move valuables to higher ground and shelter in place. "
-        "Depot: Warehouse B - Central Depot is 3.3 km."
+        "Depot: Warehouse B - Khanapara is 3.3 km."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -281,7 +281,7 @@ def test_draft_message_warning_rejects_stay_in_place(
 
     message, used_llm = draft_alert_message(session, facts, AlertLevel.WARNING)
     assert used_llm is False
-    assert "Flood warning for Zone B - Central Lowlands" in message
+    assert "Flood warning for Zone B - Beltola" in message
 
 
 def test_draft_message_rejects_evacuate_and_promises(
@@ -289,17 +289,17 @@ def test_draft_message_rejects_evacuate_and_promises(
 ) -> None:
     """Verify rejection of unauthorized 'evacuate' commands or promises like 'help is on the way'."""
     facts = {
-        "region": "Zone A - Riverside",
+        "region": "Zone A - Bharalumukh",
         "alert_level_label": "Urgent warning",
         "rainfall_mm": 90,
-        "nearest_warehouse": "Warehouse A - North Depot",
+        "nearest_warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 3.3,
     }
 
     # Case 1: unauthorized evacuate
     evac_text = (
         "URGENT warning for Zone A: 90 mm rain. Evacuate immediately to higher ground! "
-        "Depot: Warehouse A - North Depot is 3.3 km."
+        "Depot: Warehouse A - Fancy Bazaar is 3.3 km."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -312,7 +312,7 @@ def test_draft_message_rejects_evacuate_and_promises(
     # Case 2: unverified promise "help is on the way"
     promise_text = (
         "URGENT warning for Zone A: 90 mm rain. Move to higher ground now. Help is on the way! "
-        "Depot: Warehouse A - North Depot is 3.3 km."
+        "Depot: Warehouse A - Fancy Bazaar is 3.3 km."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -325,7 +325,7 @@ def test_draft_message_rejects_evacuate_and_promises(
     # Case 3: unverified promise "rescue is coming"
     rescue_text = (
         "URGENT warning for Zone A: 90 mm rain. Move to higher ground now. Rescue is coming soon. "
-        "Depot: Warehouse A - North Depot is 3.3 km."
+        "Depot: Warehouse A - Fancy Bazaar is 3.3 km."
     )
     monkeypatch.setattr(
         alert_drafting,
@@ -341,17 +341,17 @@ def test_draft_message_accepts_good_message_from_approved_steps(
 ) -> None:
     """Verify that a compliant message built strictly from approved safety steps is accepted."""
     facts = {
-        "region": "Zone A - Riverside",
+        "region": "Zone A - Bharalumukh",
         "alert_level_label": "Urgent warning",
         "rainfall_mm": 90,
-        "nearest_warehouse": "Warehouse A - North Depot",
+        "nearest_warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 3.3,
     }
 
     good_text = (
         "URGENT flood warning for Zone A: 90 mm rain expected. "
         "Move to higher ground now, stay away from flooded roads and electrical lines, and help elderly neighbours. "
-        "Nearest depot: Warehouse A - North Depot, 3.3 km away."
+        "Nearest depot: Warehouse A - Fancy Bazaar, 3.3 km away."
     )
     monkeypatch.setattr(
         alert_drafting,

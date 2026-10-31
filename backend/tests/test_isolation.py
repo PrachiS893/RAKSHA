@@ -73,7 +73,7 @@ def test_default_environment_approving_alert_skips_telegram(
     assert settings.TELEGRAM_BOT_TOKEN == ""
 
     # Find Zone A
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     # Ensure a subscriber with a Telegram chat ID exists in Zone A
@@ -102,7 +102,7 @@ def test_default_environment_approving_alert_skips_telegram(
     draft = Alert(
         region_id=region_a.id,
         level=AlertLevel.WARNING.value,
-        message="Flood warning for Zone A - Riverside: move valuables to higher ground.",
+        message="Flood warning for Zone A - Bharalumukh: move valuables to higher ground.",
         status=AlertStatus.DRAFT.value,
     )
     session.add(draft)

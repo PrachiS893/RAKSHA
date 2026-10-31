@@ -114,8 +114,8 @@ def test_ors_geometry_crossing_hazard_is_flagged(
                     "geometry": {
                         "type": "LineString",
                         "coordinates": [
-                            [91.730, 26.195],
-                            [91.750, 26.195],
+                            [91.740, 26.172050],
+                            [91.750, 26.172050],
                         ],
                     },
                     "properties": {
@@ -128,7 +128,7 @@ def test_ors_geometry_crossing_hazard_is_flagged(
 
     monkeypatch.setattr(httpx, "post", mock_post)
 
-    route = get_route((26.195, 91.730), (26.195, 91.750), active_hazards)
+    route = get_route((26.172050, 91.740), (26.172050, 91.750), active_hazards)
     assert route["provider"] == "ors"
     assert route["hazard_free"] is False
     assert "Flooded underpass - north approach" in route["crossed_hazards"]
@@ -161,8 +161,8 @@ def test_ors_failure_falls_back_to_osrm_choosing_hazard_free_alt(
                     "geometry": {
                         "type": "LineString",
                         "coordinates": [
-                            [91.730, 26.195],
-                            [91.750, 26.195],
+                            [91.740, 26.172050],
+                            [91.750, 26.172050],
                         ],
                     },
                 },
@@ -214,8 +214,8 @@ def test_osrm_all_alternatives_cross_hazards_returns_shortest_with_warning(
                     "geometry": {
                         "type": "LineString",
                         "coordinates": [
-                            [91.730, 26.195],
-                            [91.750, 26.195],
+                            [91.740, 26.172050],
+                            [91.750, 26.172050],
                         ],
                     },
                 },
@@ -225,8 +225,8 @@ def test_osrm_all_alternatives_cross_hazards_returns_shortest_with_warning(
                     "geometry": {
                         "type": "LineString",
                         "coordinates": [
-                            [91.735, 26.194],
-                            [91.745, 26.196],
+                            [91.742, 26.171000],
+                            [91.748, 26.173000],
                         ],
                     },
                 },

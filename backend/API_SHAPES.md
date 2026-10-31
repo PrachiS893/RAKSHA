@@ -30,7 +30,7 @@ Lists all monitored flood zones, their boundary polygons, center points, and cur
 [
   {
     "id": 1,
-    "name": "Zone A - Riverside",
+    "name": "Zone A - Bharalumukh",
     "polygon": {
       "type": "Polygon",
       "coordinates": [
@@ -69,7 +69,7 @@ Lists all supply warehouses with their nested inventory resources and units.
 [
   {
     "id": 1,
-    "name": "Warehouse A - North Depot",
+    "name": "Warehouse A - Fancy Bazaar",
     "lat": 26.21,
     "lon": 91.74,
     "inventory": [
@@ -127,17 +127,17 @@ Calculates predicted supply deficits across all monitored flood zones based on c
       "by_region": [
         {
           "region_id": 1,
-          "region": "Zone A - Riverside",
+          "region": "Zone A - Bharalumukh",
           "demand": 800.0
         },
         {
           "region_id": 2,
-          "region": "Zone B - Central Lowlands",
+          "region": "Zone B - Beltola",
           "demand": 480.0
         },
         {
           "region_id": 3,
-          "region": "Zone C - Eastern Uplands",
+          "region": "Zone C - Noonmati",
           "demand": 60.0
         }
       ]
@@ -152,17 +152,17 @@ Calculates predicted supply deficits across all monitored flood zones based on c
       "by_region": [
         {
           "region_id": 1,
-          "region": "Zone A - Riverside",
+          "region": "Zone A - Bharalumukh",
           "demand": 240.0
         },
         {
           "region_id": 2,
-          "region": "Zone B - Central Lowlands",
+          "region": "Zone B - Beltola",
           "demand": 144.0
         },
         {
           "region_id": 3,
-          "region": "Zone C - Eastern Uplands",
+          "region": "Zone C - Noonmati",
           "demand": 18.0
         }
       ]
@@ -177,17 +177,17 @@ Calculates predicted supply deficits across all monitored flood zones based on c
       "by_region": [
         {
           "region_id": 1,
-          "region": "Zone A - Riverside",
+          "region": "Zone A - Bharalumukh",
           "demand": 4.0
         },
         {
           "region_id": 2,
-          "region": "Zone B - Central Lowlands",
+          "region": "Zone B - Beltola",
           "demand": 2.4
         },
         {
           "region_id": 3,
-          "region": "Zone C - Eastern Uplands",
+          "region": "Zone C - Noonmati",
           "demand": 0.3
         }
       ]
@@ -202,17 +202,17 @@ Calculates predicted supply deficits across all monitored flood zones based on c
       "by_region": [
         {
           "region_id": 1,
-          "region": "Zone A - Riverside",
+          "region": "Zone A - Bharalumukh",
           "demand": 3.2
         },
         {
           "region_id": 2,
-          "region": "Zone B - Central Lowlands",
+          "region": "Zone B - Beltola",
           "demand": 1.9
         },
         {
           "region_id": 3,
-          "region": "Zone C - Eastern Uplands",
+          "region": "Zone C - Noonmati",
           "demand": 0.2
         }
       ]
@@ -243,7 +243,7 @@ Returns citizen distress requests sorted by `priority_score` descending (nulls l
     "lat": 26.175,
     "lon": 91.745,
     "region_id": 1,
-    "region_name": "Zone A - Riverside",
+    "region_name": "Zone A - Bharalumukh",
     "status": "prioritized",
     "resource_needed": "medical_kit",
     "people_count": 1,
@@ -318,7 +318,7 @@ If `TRIAGE_ON_SUBMIT=true` (default setting in `.env`), the Triage Agent automat
   "lat": 26.135,
   "lon": 91.735,
   "region_id": 2,
-  "region_name": "Zone B - Central Lowlands",
+  "region_name": "Zone B - Beltola",
   "status": "prioritized",
   "resource_needed": "drinking_water",
   "people_count": 6,
@@ -370,10 +370,10 @@ Citizen alert feed. Returns only alerts whose status is `"approved"` or `"sent"`
   {
     "id": 1,
     "region_id": 1,
-    "region_name": "Zone A - Riverside",
+    "region_name": "Zone A - Bharalumukh",
     "level": "WARNING",
     "level_label": "Warning",
-    "message": "Flood warning for Zone A: heavy rainfall (about 80 mm) may cause flooding. Move valuables and documents to higher ground, keep drinking water and medicines ready, and avoid flooded roads. Nearest relief point: Warehouse A - North Depot, about 3.3 km away.",
+    "message": "Flood warning for Zone A: heavy rainfall (about 80 mm) may cause flooding. Move valuables and documents to higher ground, keep drinking water and medicines ready, and avoid flooded roads. Nearest relief point: Warehouse A - Fancy Bazaar, about 3.3 km away.",
     "status": "sent",
     "requires_approval": true,
     "approved_by": "Coordinator Sarah",
@@ -417,10 +417,10 @@ Coordinator inbox feed. Returns all disaster alerts currently in `"draft"` statu
   {
     "id": 2,
     "region_id": 1,
-    "region_name": "Zone A - Riverside",
+    "region_name": "Zone A - Bharalumukh",
     "level": "URGENT",
     "level_label": "Urgent warning",
-    "message": "URGENT flood warning for Zone A - Riverside: severe flooding is likely (about 125 mm of rain). Move to higher ground now, stay away from flooded roads and electrical lines, and help children and elderly neighbours. Nearest relief point: Warehouse A - North Depot, about 3.3 km away.",
+    "message": "URGENT flood warning for Zone A - Bharalumukh: severe flooding is likely (about 125 mm of rain). Move to higher ground now, stay away from flooded roads and electrical lines, and help children and elderly neighbours. Nearest relief point: Warehouse A - Fancy Bazaar, about 3.3 km away.",
     "status": "draft",
     "requires_approval": true,
     "approved_by": null,
@@ -440,7 +440,7 @@ Human coordinator approves a draft alert, triggers automated multi-channel deliv
 ```json
 {
   "approved_by": "Coordinator Sarah",
-  "message": "Flood warning for Zone A: 80 mm rainfall expected. Move belongings to higher ground. Nearest depot: Warehouse A - North Depot, 3.3 km."
+  "message": "Flood warning for Zone A: 80 mm rainfall expected. Move belongings to higher ground. Nearest depot: Warehouse A - Fancy Bazaar, 3.3 km."
 }
 ```
 *Note: If `message` is omitted, the original drafted message is dispatched.*
@@ -450,7 +450,7 @@ Human coordinator approves a draft alert, triggers automated multi-channel deliv
 - If the alert is not in `"draft"` status (e.g. already sent or superseded): Returns `409 Conflict`.
 - If an edited `message` is provided:
   - Must be between 10 and 320 characters.
-  - Must reference the region name (either the full name e.g. `"Zone A - Riverside"` or the short name e.g. `"Zone A"`).
+  - Must reference the region name (either the full name e.g. `"Zone A - Bharalumukh"` or the short name e.g. `"Zone A"`).
   - Fails with `422 Unprocessable Entity` if non-compliant.
 
 #### Response (`200 OK`)
@@ -480,7 +480,7 @@ Registers a citizen to receive emergency alerts for a given region.
 {
   "id": 5,
   "region_id": 1,
-  "region_name": "Zone A - Riverside",
+  "region_name": "Zone A - Bharalumukh",
   "name": "Citizen User",
   "telegram_chat_id": "123456789"
 }
@@ -700,14 +700,14 @@ Preview triage feature extraction and priority score calculation without modifyi
   "id": 1,
   "request_id": 3,
   "request_ref": "R3",
-  "region_name": "Zone A - Riverside",
+  "region_name": "Zone A - Bharalumukh",
   "priority_score": 100,
   "urgency": "CRITICAL",
   "resource": "rescue_boat",
   "unit": "boats",
   "quantity": 1,
   "warehouse_id": 1,
-  "warehouse": "Warehouse A - North Depot",
+  "warehouse": "Warehouse A - Fancy Bazaar",
   "distance_km": 2.8,
   "partial": false,
   "unmet_quantity": 0,
@@ -745,14 +745,14 @@ Retrieves the active relief plan without re-evaluating allocations.
       "id": 1,
       "request_id": 3,
       "request_ref": "R3",
-      "region_name": "Zone A - Riverside",
+      "region_name": "Zone A - Bharalumukh",
       "priority_score": 100,
       "urgency": "CRITICAL",
       "resource": "rescue_boat",
       "unit": "boats",
       "quantity": 1,
       "warehouse_id": 1,
-      "warehouse": "Warehouse A - North Depot",
+      "warehouse": "Warehouse A - Fancy Bazaar",
       "distance_km": 2.8,
       "partial": false,
       "unmet_quantity": 0,
@@ -903,14 +903,14 @@ Computes safe delivery routes for all assignments that do not yet have one (or f
         "id": 1,
         "request_id": 3,
         "request_ref": "R3",
-        "region_name": "Zone A - Riverside",
+        "region_name": "Zone A - Bharalumukh",
         "priority_score": 100,
         "urgency": "CRITICAL",
         "resource": "rescue_boat",
         "unit": "boats",
         "quantity": 1,
         "warehouse_id": 1,
-        "warehouse": "Warehouse A - North Depot",
+        "warehouse": "Warehouse A - Fancy Bazaar",
         "distance_km": 21.3,
         "partial": false,
         "unmet_quantity": 0,
@@ -971,27 +971,27 @@ Resets the simulation to Stage 1 ("Normal conditions"), restoring all warehouse 
   "stats": {
     "highest_risk": {
       "region_id": 1,
-      "region": "Zone A - Riverside",
+      "region": "Zone A - Bharalumukh",
       "risk_level": "SEVERE"
     },
     "regions": [
       {
         "id": 1,
-        "name": "Zone A - Riverside",
+        "name": "Zone A - Bharalumukh",
         "risk_level": "SEVERE",
         "rainfall_mm": 90.0,
         "is_flooded": false
       },
       {
         "id": 2,
-        "name": "Zone B - Central Lowlands",
+        "name": "Zone B - Beltola",
         "risk_level": "HIGH",
         "rainfall_mm": 70.0,
         "is_flooded": false
       },
       {
         "id": 3,
-        "name": "Zone C - Eastern Uplands",
+        "name": "Zone C - Noonmati",
         "risk_level": "MODERATE",
         "rainfall_mm": 40.0,
         "is_flooded": false
@@ -1005,12 +1005,12 @@ Resets the simulation to Stage 1 ("Normal conditions"), restoring all warehouse 
     "hazards_active": 0
   },
   "events": [
-    "Zone A - Riverside risk is now SEVERE",
-    "Zone B - Central Lowlands risk is now HIGH",
-    "Zone C - Eastern Uplands risk is now MODERATE",
-    "Urgent warning drafted for Zone A - Riverside, awaiting approval",
-    "Warning drafted for Zone B - Central Lowlands, awaiting approval",
-    "Advisory sent for Zone C - Eastern Uplands",
+    "Zone A - Bharalumukh risk is now SEVERE",
+    "Zone B - Beltola risk is now HIGH",
+    "Zone C - Noonmati risk is now MODERATE",
+    "Urgent warning drafted for Zone A - Bharalumukh, awaiting approval",
+    "Warning drafted for Zone B - Beltola, awaiting approval",
+    "Advisory sent for Zone C - Noonmati",
     "Shortage predicted: drinking_water (SHORTAGE, stock 550 vs expected demand 1340)",
     "Shortage predicted: food_packet (SHORTAGE, stock 360 vs expected demand 402)",
     "Shortage predicted: medical_kit (TIGHT, stock 8 vs expected demand 7)",
@@ -1024,13 +1024,13 @@ Resets the simulation to Stage 1 ("Normal conditions"), restoring all warehouse 
 In Stage 3 ("Flood begins"):
 ```json
 "events": [
-  "Zone A - Riverside is now flooded",
-  "Zone B - Central Lowlands is now flooded",
+  "Zone A - Bharalumukh is now flooded",
+  "Zone B - Beltola is now flooded",
   "2 simulated hazard zones activated: Flooded underpass - north approach, River overflow - south approach",
-  "Emergency request R1 received from Zone A - Riverside: drinking_water",
-  "Emergency request R2 received from Zone B - Central Lowlands: medical_kit",
-  "Emergency request R3 received from Zone A - Riverside: rescue_boat",
-  "Emergency request R4 received from Zone A - Riverside: food_packet"
+  "Emergency request R1 received from Zone A - Bharalumukh: drinking_water",
+  "Emergency request R2 received from Zone B - Beltola: medical_kit",
+  "Emergency request R3 received from Zone A - Bharalumukh: rescue_boat",
+  "Emergency request R4 received from Zone A - Bharalumukh: food_packet"
 ]
 ```
 

@@ -47,7 +47,7 @@ def test_dev_risk_check_success_and_calculation(client: TestClient) -> None:
     data = response.json()
 
     assert data["region_id"] == 1
-    assert data["region"] == "Zone A - Riverside"
+    assert data["region"] == "Zone A - Bharalumukh"
     assert data["risk_level"] == "SEVERE"
     assert data["rainfall_mm"] == 90.0
     assert data["rainfall_source"] == "simulated"

@@ -105,10 +105,10 @@ def test_relief_agent_four_sample_requests(
     assert current_inventory == initial_inventory
 
     # Check specific assignments
-    # 1. Elderly trapped -> rescue_boat x1 from Warehouse A
-    # 2. Amit (insulin) -> medical_kit x1 from Warehouse A
-    # 3. Rina (water 6 people) -> drinking_water x18 from Warehouse B
-    # 4. Pooja (food 5 people) -> food_packet x15 from Warehouse B
+    # 1. Elderly trapped -> rescue_boat x1 from Warehouse A (Fancy Bazaar)
+    # 2. Amit (insulin) -> medical_kit x1 from Warehouse C (Noonmati, 2.2 km)
+    # 3. Rina (water 6 people) -> drinking_water x18 from Warehouse B (Khanapara, 4.8 km)
+    # 4. Pooja (food 5 people) -> food_packet x15 from Warehouse B (Khanapara, 3.8 km)
     asgn_by_res = {a.resource: a for a in plan.assignments}
 
     boat_asgn = asgn_by_res[Resource.RESCUE_BOAT.value]
@@ -119,7 +119,7 @@ def test_relief_agent_four_sample_requests(
 
     med_asgn = asgn_by_res[Resource.MEDICAL_KIT.value]
     assert med_asgn.quantity == 1
-    assert "Warehouse A" in med_asgn.warehouse
+    assert "Warehouse C" in med_asgn.warehouse
 
     water_asgn = asgn_by_res[Resource.DRINKING_WATER.value]
     assert water_asgn.quantity == 18

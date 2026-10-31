@@ -18,9 +18,9 @@ def test_predict_shortages_flood_conditions(client_and_session: tuple[TestClient
     regions = session.exec(select(Region)).all()
     reg_map = {r.name: r for r in regions}
 
-    reg_map["Zone A - Riverside"].risk_level = RiskLevel.SEVERE.value
-    reg_map["Zone B - Central Lowlands"].risk_level = RiskLevel.HIGH.value
-    reg_map["Zone C - Eastern Uplands"].risk_level = RiskLevel.MODERATE.value
+    reg_map["Zone A - Bharalumukh"].risk_level = RiskLevel.SEVERE.value
+    reg_map["Zone B - Beltola"].risk_level = RiskLevel.HIGH.value
+    reg_map["Zone C - Noonmati"].risk_level = RiskLevel.MODERATE.value
     for r in regions:
         session.add(r)
     session.commit()
@@ -65,9 +65,9 @@ def test_predict_shortages_flood_conditions(client_and_session: tuple[TestClient
 
     # Verify regional breakdowns
     water_by_reg = {b["region"]: b["demand"] for b in water["by_region"]}
-    assert water_by_reg["Zone A - Riverside"] == 800.0
-    assert water_by_reg["Zone B - Central Lowlands"] == 480.0
-    assert water_by_reg["Zone C - Eastern Uplands"] == 60.0
+    assert water_by_reg["Zone A - Bharalumukh"] == 800.0
+    assert water_by_reg["Zone B - Beltola"] == 480.0
+    assert water_by_reg["Zone C - Noonmati"] == 60.0
 
 
 def test_predict_shortages_all_low_conditions(client_and_session: tuple[TestClient, Session]) -> None:

@@ -29,19 +29,19 @@ def _get_test_hazards() -> list[dict]:
 def test_crossed_hazards_detection_and_corner_touching() -> None:
     hazards = _get_test_hazards()
 
-    # Hazard 1: lon [91.738, 91.744], lat [26.193, 26.198]
+    # Hazard 1: lon [91.743998, 91.746998], lat [26.170550, 26.173550]
     # 1. Crossing line straight through the center
     line_crossing = [
-        [91.730, 26.195],
-        [91.750, 26.195],
+        [91.740, 26.172050],
+        [91.750, 26.172050],
     ]
     crossed = crossed_hazards(line_crossing, hazards)
     assert crossed == ["Flooded underpass - north approach"]
 
-    # 2. Line that only touches a corner at (91.738, 26.193)
+    # 2. Line that only touches a corner at (91.743998, 26.170550)
     line_corner_touch = [
-        [91.730, 26.193],
-        [91.738, 26.193],
+        [91.740, 26.170550],
+        [91.743998, 26.170550],
     ]
     assert crossed_hazards(line_corner_touch, hazards) == []
 

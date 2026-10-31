@@ -45,9 +45,9 @@ def test_get_regions(client: TestClient) -> None:
     assert len(regions) == 3
 
     zone_names = [r["name"] for r in regions]
-    assert "Zone A - Riverside" in zone_names
-    assert "Zone B - Central Lowlands" in zone_names
-    assert "Zone C - Eastern Uplands" in zone_names
+    assert "Zone A - Bharalumukh" in zone_names
+    assert "Zone B - Beltola" in zone_names
+    assert "Zone C - Noonmati" in zone_names
 
     for r in regions:
         assert "id" in r
@@ -69,7 +69,7 @@ def test_get_warehouses_includes_nested_inventory(client: TestClient) -> None:
     warehouses = response.json()
     assert len(warehouses) == 3
 
-    warehouse_a = next(w for w in warehouses if "North Depot" in w["name"])
+    warehouse_a = next(w for w in warehouses if "Fancy Bazaar" in w["name"])
     assert warehouse_a["simulated"] is True
     assert len(warehouse_a["inventory"]) == 4
 
@@ -81,12 +81,12 @@ def test_get_warehouses_includes_nested_inventory(client: TestClient) -> None:
 
 def test_create_request_inside_zone(client: TestClient) -> None:
     """Verify that POST /requests inside Zone A detects region_id and returns 201."""
-    # Point inside Zone A: lat 26.175, lon 91.745
+    # Point inside Zone A: lat 26.166420, lon 91.766246
     payload = {
         "text": "My father is diabetic and has run out of insulin. He is very weak.",
         "name": "Amit",
-        "lat": 26.175,
-        "lon": 91.745,
+        "lat": 26.166420,
+        "lon": 91.766246,
     }
     response = client.post("/requests", json=payload)
     assert response.status_code == 201
@@ -94,7 +94,7 @@ def test_create_request_inside_zone(client: TestClient) -> None:
 
     assert data["status"] in ("received", "prioritized")
     assert data["name"] == "Amit"
-    assert data["region_name"] == "Zone A - Riverside"
+    assert data["region_name"] == "Zone A - Bharalumukh"
     assert data["region_id"] is not None
     assert "created_at" in data
 

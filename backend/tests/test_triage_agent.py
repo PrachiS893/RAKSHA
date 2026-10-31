@@ -29,14 +29,14 @@ def session_fixture() -> Generator[Session, None, None]:
 def test_run_triage_agent_persists_and_logs(session: Session) -> None:
     """Verify run_triage_agent updates request in DB and writes audit logs."""
     # Find Zone A
-    region = session.exec(select(Region).where(Region.name.like("%Riverside%"))).first()
+    region = session.exec(select(Region).where(Region.name.like("%Zone A%"))).first()
     assert region is not None
 
     req = create_request(
         session=session,
         text="My father is diabetic and has run out of insulin. He is very weak.",
-        lat=26.175,
-        lon=91.745,
+        lat=26.166420,
+        lon=91.766246,
         name="Amit",
         triage=False,
     )

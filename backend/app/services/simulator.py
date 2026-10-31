@@ -19,6 +19,7 @@ from app.demo_data import (
     SAMPLE_REQUESTS,
     STAGE_RAINFALL,
     STAGES,
+    ZONE_CODES,
 )
 from app.models import (
     AgentLog,
@@ -61,20 +62,18 @@ def get_state(session: Session) -> int:
 
 
 def get_stage_rainfall_by_id(session: Session, stage: int) -> dict[int, float]:
-    """Map region names in STAGE_RAINFALL to database region IDs."""
-    rainfall_by_name = STAGE_RAINFALL.get(stage, {})
+    """Map zone codes / region names in STAGE_RAINFALL to database region IDs."""
+    rainfall_by_key = STAGE_RAINFALL.get(stage, {})
     regions = session.exec(select(Region)).all()
     override_by_id: dict[int, float] = {}
     for r in regions:
         if r.id is None:
             continue
-        if r.name in rainfall_by_name:
-            override_by_id[r.id] = rainfall_by_name[r.name]
-        else:
-            for name_key, val in rainfall_by_name.items():
-                if name_key in r.name or r.name in name_key:
-                    override_by_id[r.id] = val
-                    break
+        for key, val in rainfall_by_key.items():
+            full_name = ZONE_CODES.get(key, key)
+            if r.name == key or r.name == full_name or f"Zone {key}" in r.name:
+                override_by_id[r.id] = val
+                break
     return override_by_id
 
 
@@ -116,7 +115,13 @@ def handle_stage_3(session: Session) -> list[str]:
     flooded_names: list[str] = []
     regions = session.exec(select(Region)).all()
     for r in regions:
-        if any(fz in r.name or r.name in fz for fz in FLOODED_ZONES_STAGE_3):
+        is_flooded = False
+        for item in FLOODED_ZONES_STAGE_3:
+            full_name = ZONE_CODES.get(item, item)
+            if r.name == item or r.name == full_name or f"Zone {item}" in r.name:
+                is_flooded = True
+                break
+        if is_flooded:
             r.is_flooded = True
             flooded_names.append(r.name)
         else:

@@ -47,20 +47,20 @@ def test_risk_agent_with_llm_text(session: Session, monkeypatch: pytest.MonkeyPa
 
     # Mock LLM response
     mock_explanation = RiskExplanation(
-        reason="Heavy rainfall expected across riverside zone.",
+        reason="Heavy rainfall expected across Bharalumukh zone.",
         action="Prepare sandbags and pre-position relief teams.",
     )
     monkeypatch.setattr(
         risk_agent, "generate_json", lambda prompt, schema, system=None: mock_explanation
     )
 
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     report = run_risk_agent(session, region_a, persist=False)
     # 50 mm * (0.5 + 0.9) = 70.0 mm -> HIGH
     assert report.risk_level == RiskLevel.HIGH
-    assert report.reason == "Heavy rainfall expected across riverside zone."
+    assert report.reason == "Heavy rainfall expected across Bharalumukh zone."
     assert report.action == "Prepare sandbags and pre-position relief teams."
     assert report.simulated is True
     assert report.rainfall_source == "simulated"
@@ -88,7 +88,7 @@ def test_risk_agent_with_template_fallback(
     # Mock LLM to return None
     monkeypatch.setattr(risk_agent, "generate_json", lambda prompt, schema, system=None: None)
 
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     report = run_risk_agent(session, region_a, persist=False)
@@ -131,7 +131,7 @@ def test_risk_agent_golden_rule_overrides_llm_hallucination(
         lambda prompt, schema, system=None: hallucinated_explanation,
     )
 
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     report = run_risk_agent(session, region_a, persist=False)
@@ -145,7 +145,7 @@ def test_risk_agent_writes_agent_logs(
     """Verify that running the agent writes logs with agent='Risk' to agent_logs table."""
     monkeypatch.setattr(risk_agent, "generate_json", lambda prompt, schema, system=None: None)
 
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
 
     run_risk_agent(session, region_a, override_rainfall_mm=30.0, persist=False)
@@ -155,7 +155,7 @@ def test_risk_agent_writes_agent_logs(
 
     log_messages = [l.message for l in logs]
     assert any("Checking rainfall forecast" in m for m in log_messages)
-    assert any("Forecast for Zone A - Riverside" in m for m in log_messages)
+    assert any("Forecast for Zone A - Bharalumukh" in m for m in log_messages)
     assert any("Risk level" in m for m in log_messages)
 
 
@@ -165,7 +165,7 @@ def test_risk_agent_persist_flag(
     """Verify persist=True updates region row in DB and persist=False leaves it unchanged."""
     monkeypatch.setattr(risk_agent, "generate_json", lambda prompt, schema, system=None: None)
 
-    region_a = session.exec(select(Region).where(Region.name == "Zone A - Riverside")).first()
+    region_a = session.exec(select(Region).where(Region.name == "Zone A - Bharalumukh")).first()
     assert region_a is not None
     initial_rain = region_a.rainfall_mm
     initial_risk = region_a.risk_level
@@ -199,6 +199,6 @@ def test_run_risk_agent_all_returns_three_reports(
     assert all(isinstance(r, RiskReport) for r in reports)
 
     zone_names = [r.region for r in reports]
-    assert "Zone A - Riverside" in zone_names
-    assert "Zone B - Central Lowlands" in zone_names
-    assert "Zone C - Eastern Uplands" in zone_names
+    assert "Zone A - Bharalumukh" in zone_names
+    assert "Zone B - Beltola" in zone_names
+    assert "Zone C - Noonmati" in zone_names
