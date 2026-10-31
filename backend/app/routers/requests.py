@@ -9,6 +9,7 @@ from app.constants import RequestStatus
 from app.db import get_session
 from app.models import Region, Request
 from app.schemas import RequestCreate, RequestRead, format_iso_utc
+from app.services.request_intake import create_request as intake_create_request
 
 router = APIRouter(prefix="/requests", tags=["Requests"])
 
@@ -75,36 +76,19 @@ def create_request(
 
     Determines regional flood zone using Shapely point-in-polygon check.
     """
-    regions = session.exec(select(Region)).all()
-    target_region_id: Optional[int] = None
-    target_region_name: Optional[str] = None
-
-    # Point uses (longitude, latitude) matching GeoJSON [lon, lat] coordinate format
-    request_point = Point(payload.lon, payload.lat)
-
-    for region in regions:
-        region_shape = shape(region.polygon)
-        if region_shape.covers(request_point) or region_shape.contains(request_point):
-            target_region_id = region.id
-            target_region_name = region.name
-            break
-
-    db_request = Request(
+    db_request = intake_create_request(
+        session=session,
         text=payload.text,
-        name=payload.name,
         lat=payload.lat,
         lon=payload.lon,
-        region_id=target_region_id,
-        status=RequestStatus.RECEIVED.value,
-        resource_needed=None,
-        people_count=None,
-        urgency=None,
-        priority_score=None,
-        reason=None,
+        name=payload.name,
     )
-    session.add(db_request)
-    session.commit()
-    session.refresh(db_request)
+
+    region_name: Optional[str] = None
+    if db_request.region_id is not None:
+        region = session.get(Region, db_request.region_id)
+        if region is not None:
+            region_name = region.name
 
     return RequestRead(
         id=db_request.id,
@@ -113,7 +97,7 @@ def create_request(
         lat=db_request.lat,
         lon=db_request.lon,
         region_id=db_request.region_id,
-        region_name=target_region_name,
+        region_name=region_name,
         status=db_request.status,
         resource_needed=db_request.resource_needed,
         people_count=db_request.people_count,

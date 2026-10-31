@@ -2,12 +2,17 @@
 
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+import httpx
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from app.agents.risk_agent import run_risk_agent
+from app.config import settings
 from app.db import get_session
 from app.models import AgentLog, Region
-from app.schemas import RiskReport, format_iso_utc
+from app.routers.alerts import _to_alert_read
+from app.schemas import AlertRead, RiskReport, format_iso_utc
+from app.services.llm import generate_json
+from app.services.notification import handle_risk_reports
 
 router = APIRouter(prefix="/dev", tags=["Dev (not for frontend)"])
 
@@ -20,6 +25,27 @@ class AgentLogRead(BaseModel):
     message: str
     payload: Optional[dict[str, Any]] = None
     created_at: str
+
+
+class TelegramTestResponse(BaseModel):
+    """Response schema for Telegram test send operation."""
+
+    ok: bool
+    detail: str
+
+
+class LLMTestResponse(BaseModel):
+    """Response schema for LLM test execution."""
+
+    ok: bool
+    model: str
+    detail: str
+
+
+class TinyAnswerSchema(BaseModel):
+    """Minimal schema for validating LLM structured output connectivity."""
+
+    answer: str
 
 
 @router.post(
@@ -46,6 +72,112 @@ def dev_risk_check(
         region=region,
         override_rainfall_mm=rainfall_mm,
         persist=persist,
+    )
+
+
+@router.post(
+    "/draft-alert/{region_id}",
+    response_model=list[AlertRead],
+    summary="Run Risk Agent and generate draft/auto alerts for a region (dev only)",
+)
+def dev_draft_alert(
+    region_id: int,
+    rainfall_mm: Optional[float] = Query(default=None),
+    session: Session = Depends(get_session),
+) -> list[AlertRead]:
+    """Execute Risk Agent on region with persist=True, process via Notification Service, and return created alerts."""
+    region = session.get(Region, region_id)
+    if not region:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Region with id {region_id} not found",
+        )
+
+    report = run_risk_agent(
+        session=session,
+        region=region,
+        override_rainfall_mm=rainfall_mm,
+        persist=True,
+    )
+    created_alerts = handle_risk_reports(session, [report])
+
+    regions = session.exec(select(Region)).all()
+    region_map: dict[int, str] = {r.id: r.name for r in regions if r.id is not None}
+
+    return [
+        _to_alert_read(
+            session=session,
+            alert=a,
+            region_name=region_map.get(a.region_id, "Unknown Region"),
+            include_deliveries=True,
+        )
+        for a in created_alerts
+    ]
+
+
+@router.post(
+    "/telegram-test",
+    response_model=TelegramTestResponse,
+    summary="Send a test message to Telegram without exposing credentials (dev only)",
+)
+def dev_telegram_test(
+    chat_id: str = Query(..., description="Target Telegram chat ID"),
+) -> TelegramTestResponse:
+    """Send a demo test message via Telegram Bot API with safe error handling."""
+    token = settings.TELEGRAM_BOT_TOKEN.strip() if settings.TELEGRAM_BOT_TOKEN else ""
+    if not token:
+        return TelegramTestResponse(ok=False, detail="no bot token configured")
+
+    try:
+        with httpx.Client(timeout=8.0) as client:
+            resp = client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": "[DEMO] Raksha test message",
+                },
+            )
+            if resp.is_success:
+                return TelegramTestResponse(ok=True, detail="delivered")
+            return TelegramTestResponse(ok=False, detail=f"HTTP {resp.status_code}")
+    except Exception as exc:
+        return TelegramTestResponse(ok=False, detail=exc.__class__.__name__)
+
+
+@router.post(
+    "/llm-test",
+    response_model=LLMTestResponse,
+    summary="Test LLM structured output connectivity via Groq (dev only)",
+)
+def dev_llm_test() -> LLMTestResponse:
+    """Invoke generate_json with a minimal schema to test Groq connectivity safely."""
+    if not settings.LLM_ENABLED:
+        return LLMTestResponse(
+            ok=False,
+            model=settings.LLM_MODEL,
+            detail="LLM_ENABLED is false",
+        )
+    if not settings.LLM_API_KEY or not settings.LLM_API_KEY.strip():
+        return LLMTestResponse(
+            ok=False,
+            model=settings.LLM_MODEL,
+            detail="no LLM_API_KEY configured",
+        )
+
+    result = generate_json(
+        prompt="Reply with the word ok",
+        schema=TinyAnswerSchema,
+    )
+    if result is not None:
+        return LLMTestResponse(
+            ok=True,
+            model=settings.LLM_MODEL,
+            detail=f"received valid response: {result.answer}",
+        )
+    return LLMTestResponse(
+        ok=False,
+        model=settings.LLM_MODEL,
+        detail="generate_json returned None (call failed or validation error)",
     )
 
 

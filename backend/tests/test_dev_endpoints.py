@@ -71,3 +71,35 @@ def test_dev_agent_logs(client: TestClient) -> None:
     logs = response.json()
     assert len(logs) > 0
     assert any(log["agent"] == "Risk" for log in logs)
+
+
+def test_dev_llm_test_no_key(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify POST /dev/llm-test returns ok=false when LLM_API_KEY is unset."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "LLM_ENABLED", True)
+    monkeypatch.setattr(settings, "LLM_API_KEY", "")
+
+    response = client.post("/dev/llm-test")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ok"] is False
+    assert "no llm_api_key configured" in data["detail"].lower()
+
+
+def test_dev_llm_test_success(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify POST /dev/llm-test returns ok=true when generate_json succeeds."""
+    from app.config import settings
+    from app.routers import dev
+
+    monkeypatch.setattr(settings, "LLM_ENABLED", True)
+    monkeypatch.setattr(settings, "LLM_API_KEY", "gsk_fake_secret_key_123")
+
+    fake_result = dev.TinyAnswerSchema(answer="ok")
+    monkeypatch.setattr(dev, "generate_json", lambda prompt, schema, system=None: fake_result)
+
+    response = client.post("/dev/llm-test")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ok"] is True
+    assert "ok" in data["detail"]
+    assert "gsk_fake_secret_key_123" not in data["detail"]

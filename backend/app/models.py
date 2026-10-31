@@ -18,6 +18,7 @@ class Region(SQLModel, table=True):
     vulnerability: float
     risk_level: str = Field(default=RiskLevel.LOW.value)
     rainfall_mm: float = Field(default=0.0)
+    is_flooded: bool = Field(default=False)
     is_simulated_flood: bool = Field(default=True)
 
 
@@ -82,6 +83,10 @@ class Alert(SQLModel, table=True):
     message: str
     status: str = Field(default=AlertStatus.DRAFT.value)
     approved_by: Optional[str] = Field(default=None, nullable=True)
+    approved_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False),
@@ -104,6 +109,8 @@ class Delivery(SQLModel, table=True):
     alert_id: int = Field(foreign_key="alert.id")
     channel: str
     status: str
+    recipient: Optional[str] = Field(default=None, nullable=True)
+    detail: Optional[str] = Field(default=None, nullable=True)
     sent_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
@@ -118,6 +125,17 @@ class AgentLog(SQLModel, table=True):
     message: str
     payload: Optional[dict[str, Any]] = Field(default=None, sa_column=Column(JSON, nullable=True))
     created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class SimulationState(SQLModel, table=True):
+    """Execution state tracking the active stage of the flood simulation scenario."""
+
+    id: int = Field(default=1, primary_key=True)
+    stage: int = Field(default=1)
+    updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

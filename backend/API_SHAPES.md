@@ -49,6 +49,7 @@ Lists all monitored flood zones, their boundary polygons, center points, and cur
     "vulnerability": 0.9,
     "risk_level": "LOW",
     "rainfall_mm": 0.0,
+    "is_flooded": false,
     "is_simulated_flood": true
   }
 ]
@@ -176,10 +177,10 @@ Submit a new citizen distress call. The system automatically performs a point-in
 
 ---
 
-## 4. Public Alerts Feed
+## 4. Public Alerts Feed & Coordinator Approval
 
 ### `GET /alerts`
-Citizen alert feed. Returns approved and sent public safety alerts (excludes internal drafts), ordered newest first.
+Citizen alert feed. Returns only alerts whose status is `"approved"` or `"sent"` (internal drafts and superseded alerts are excluded), ordered newest first.
 
 #### Query Parameters (Optional)
 - `region_id` (integer, optional): Filter alerts by region ID.
@@ -192,13 +193,89 @@ Citizen alert feed. Returns approved and sent public safety alerts (excludes int
     "region_id": 1,
     "region_name": "Zone A - Riverside",
     "level": "WARNING",
-    "message": "Water levels rising near river banks. Residents advised to prepare for evacuation.",
+    "level_label": "Warning",
+    "message": "Flood warning for Zone A: heavy rainfall (about 80 mm) may cause flooding. Move valuables and documents to higher ground, keep drinking water and medicines ready, and avoid flooded roads. Nearest relief point: Warehouse A - North Depot, about 3.3 km away.",
     "status": "sent",
-    "approved_by": "coordinator",
-    "created_at": "2026-10-31T07:00:00Z"
+    "requires_approval": true,
+    "approved_by": "Coordinator Sarah",
+    "approved_at": "2026-10-31T07:10:00Z",
+    "created_at": "2026-10-31T07:00:00Z",
+    "deliveries": [
+      {
+        "channel": "in_app",
+        "status": "sent",
+        "recipient": null,
+        "detail": null,
+        "sent_at": "2026-10-31T07:10:00Z"
+      },
+      {
+        "channel": "telegram",
+        "status": "sent",
+        "recipient": "Demo Citizen 1",
+        "detail": null,
+        "sent_at": "2026-10-31T07:10:01Z"
+      },
+      {
+        "channel": "sms_sim",
+        "status": "simulated",
+        "recipient": "Demo Citizen 1",
+        "detail": null,
+        "sent_at": null
+      }
+    ]
   }
 ]
 ```
+
+---
+
+### `GET /alerts/pending`
+Coordinator inbox feed. Returns all disaster alerts currently in `"draft"` status awaiting human coordinator review, newest first. Deliveries list is empty.
+
+#### Response (`200 OK`)
+```json
+[
+  {
+    "id": 2,
+    "region_id": 1,
+    "region_name": "Zone A - Riverside",
+    "level": "URGENT",
+    "level_label": "Urgent warning",
+    "message": "URGENT flood warning for Zone A - Riverside: severe flooding is likely (about 125 mm of rain). Move to higher ground now, stay away from flooded roads and electrical lines, and help children and elderly neighbours. Nearest relief point: Warehouse A - North Depot, about 3.3 km away.",
+    "status": "draft",
+    "requires_approval": true,
+    "approved_by": null,
+    "approved_at": null,
+    "created_at": "2026-10-31T07:15:00Z",
+    "deliveries": []
+  }
+]
+```
+
+---
+
+### `POST /alerts/{id}/approve`
+Human coordinator approves a draft alert, triggers automated multi-channel delivery (in-app, Telegram, simulated SMS), and transitions status to `"sent"`.
+
+#### Request Body (Optional)
+```json
+{
+  "approved_by": "Coordinator Sarah",
+  "message": "Flood warning for Zone A: 80 mm rainfall expected. Move belongings to higher ground. Nearest depot: Warehouse A - North Depot, 3.3 km."
+}
+```
+*Note: If `message` is omitted, the original drafted message is dispatched.*
+
+#### Validation Rules & Status Codes
+- If the alert does not exist: Returns `404 Not Found`.
+- If the alert is not in `"draft"` status (e.g. already sent or superseded): Returns `409 Conflict`.
+- If an edited `message` is provided:
+  - Must be between 10 and 320 characters.
+  - Must reference the region name (either the full name e.g. `"Zone A - Riverside"` or the short name e.g. `"Zone A"`).
+  - Fails with `422 Unprocessable Entity` if non-compliant.
+
+#### Response (`200 OK`)
+Returns the approved and dispatched `Alert` object with full `deliveries` history.
 
 ---
 
@@ -227,5 +304,84 @@ Registers a citizen to receive emergency alerts for a given region.
   "region_name": "Zone A - Riverside",
   "name": "Citizen User",
   "telegram_chat_id": "123456789"
+}
+```
+
+---
+
+## 6. Simulation State & Controls
+
+> **Disclaimer**: *Illustrative simulation, not a live emergency feed.*
+
+The simulator progresses the disaster response scenario across 5 structured stages through real backend workflows (Risk Agent evaluation, alert drafting, coordinator approvals, and request intake).
+
+### `GET /simulation`
+Retrieves the active simulation stage, metadata, and operational statistics with an empty `events` list.
+
+### `POST /simulation/next`
+Advances the scenario by one stage, executes the corresponding real backend handler, and returns the updated state with human-readable `events`.
+- **Error (`409 Conflict`)**: Returned if already at terminal stage 5:
+  ```json
+  {
+    "detail": "Simulation is already at stage 5 (final stage). Reset to start over."
+  }
+  ```
+
+### `POST /simulation/reset`
+Resets the simulation to Stage 1 ("Normal conditions"), restoring all warehouse inventories to 100%, resetting regions to `LOW` risk and unflooded, and clearing operational alerts, requests, and deliveries. (Citizen subscriptions are kept intact).
+
+### Response Schema (`200 OK`)
+*(Returned by `GET /simulation`, `POST /simulation/next`, and `POST /simulation/reset`)*
+
+```json
+{
+  "stage": 2,
+  "total_stages": 5,
+  "name": "Heavy rainfall forecast",
+  "description": "The Risk Agent flags regions. Warnings are drafted for the coordinator.",
+  "can_advance": true,
+  "label": "Illustrative simulation, not a live emergency feed.",
+  "stats": {
+    "highest_risk": {
+      "region_id": 1,
+      "region": "Zone A - Riverside",
+      "risk_level": "SEVERE"
+    },
+    "regions": [
+      {
+        "id": 1,
+        "name": "Zone A - Riverside",
+        "risk_level": "SEVERE",
+        "rainfall_mm": 90.0,
+        "is_flooded": false
+      },
+      {
+        "id": 2,
+        "name": "Zone B - Central Lowlands",
+        "risk_level": "HIGH",
+        "rainfall_mm": 70.0,
+        "is_flooded": false
+      },
+      {
+        "id": 3,
+        "name": "Zone C - Eastern Uplands",
+        "risk_level": "MODERATE",
+        "rainfall_mm": 40.0,
+        "is_flooded": false
+      }
+    ],
+    "open_requests": 0,
+    "pending_alerts": 2,
+    "sent_alerts": 1,
+    "stock_remaining_pct": 100.0
+  },
+  "events": [
+    "Zone A - Riverside risk is now SEVERE",
+    "Zone B - Central Lowlands risk is now HIGH",
+    "Zone C - Eastern Uplands risk is now MODERATE",
+    "Urgent warning drafted for Zone A - Riverside, awaiting approval",
+    "Warning drafted for Zone B - Central Lowlands, awaiting approval",
+    "Advisory sent for Zone C - Eastern Uplands"
+  ]
 }
 ```

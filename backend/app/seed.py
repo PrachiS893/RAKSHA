@@ -1,6 +1,7 @@
 """Database seeding script for populating Raksha demo data."""
 
 from sqlmodel import Session, delete, select
+from app.config import settings
 from app.db import create_db_and_tables, engine
 from app.demo_data import DEMO_REGIONS, DEMO_SUBSCRIPTIONS, DEMO_WAREHOUSES
 from app.models import (
@@ -11,6 +12,7 @@ from app.models import (
     Inventory,
     Region,
     Request,
+    SimulationState,
     Subscription,
     Warehouse,
 )
@@ -29,6 +31,7 @@ def seed_database(session: Session) -> dict[str, int]:
     session.exec(delete(Subscription))
     session.exec(delete(Inventory))
     session.exec(delete(AgentLog))
+    session.exec(delete(SimulationState))
     session.exec(delete(Warehouse))
     session.exec(delete(Region))
     session.commit()
@@ -44,6 +47,7 @@ def seed_database(session: Session) -> dict[str, int]:
             vulnerability=r_data["vulnerability"],
             risk_level=r_data["risk_level"],
             rainfall_mm=r_data["rainfall_mm"],
+            is_flooded=False,
             is_simulated_flood=r_data["is_simulated_flood"],
         )
         session.add(region)
@@ -73,12 +77,19 @@ def seed_database(session: Session) -> dict[str, int]:
     # 3. Insert Subscriptions
     for s_data in DEMO_SUBSCRIPTIONS:
         reg_id = region_map[s_data["region_name"]]
+        chat_id = s_data["telegram_chat_id"]
+        if s_data["name"] == "Demo Citizen 1" and settings.DEMO_TELEGRAM_CHAT_ID:
+            chat_id = settings.DEMO_TELEGRAM_CHAT_ID
         sub = Subscription(
             region_id=reg_id,
             name=s_data["name"],
-            telegram_chat_id=s_data["telegram_chat_id"],
+            telegram_chat_id=chat_id,
         )
         session.add(sub)
+
+    # 4. Insert initial SimulationState (stage 1)
+    sim_state = SimulationState(id=1, stage=1)
+    session.add(sim_state)
 
     session.commit()
 
@@ -93,6 +104,7 @@ def seed_database(session: Session) -> dict[str, int]:
         "alerts": len(session.exec(select(Alert)).all()),
         "deliveries": len(session.exec(select(Delivery)).all()),
         "agent_logs": len(session.exec(select(AgentLog)).all()),
+        "simulation_state": len(session.exec(select(SimulationState)).all()),
     }
     return counts
 

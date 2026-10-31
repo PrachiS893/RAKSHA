@@ -143,3 +143,52 @@ SAMPLE_REQUESTS: list[dict[str, Any]] = [
         "lon": 91.75,
     },
 ]
+
+# 5 predefined stages of the flood response scenario
+STAGES: list[dict[str, Any]] = [
+    {
+        "stage": 1,
+        "name": "Normal conditions",
+        "description": "Risk is low everywhere. No alerts, no requests, stock at 100%.",
+    },
+    {
+        "stage": 2,
+        "name": "Heavy rainfall forecast",
+        "description": "The Risk Agent flags regions. Warnings are drafted for the coordinator.",
+    },
+    {
+        "stage": 3,
+        "name": "Flood begins",
+        "description": "Flooding starts in the lowest zones and four emergency requests arrive.",
+    },
+    {
+        "stage": 4,
+        "name": "Triage and allocation",
+        "description": "Requests are ranked and supplies are recommended.",
+    },
+    {
+        "stage": 5,
+        "name": "Routes and approval",
+        "description": "Safe delivery routes are shown and the coordinator approves the plan.",
+    },
+]
+
+# 24h forecast rainfall (in mm) by region name for simulation stages
+STAGE_RAINFALL: dict[int, dict[str, float]] = {
+    2: {
+        "Zone A - Riverside": 90.0,
+        "Zone B - Central Lowlands": 70.0,
+        "Zone C - Eastern Uplands": 40.0,
+    },
+    3: {
+        "Zone A - Riverside": 110.0,
+        "Zone B - Central Lowlands": 85.0,
+        "Zone C - Eastern Uplands": 50.0,
+    },
+}
+
+# Monitored zones marked flooded during Stage 3
+FLOODED_ZONES_STAGE_3: list[str] = [
+    "Zone A - Riverside",
+    "Zone B - Central Lowlands",
+]

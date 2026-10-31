@@ -21,7 +21,10 @@ class Settings:
     ORS_API_KEY: str = os.getenv("ORS_API_KEY") or ""
     APP_ENV: str = os.getenv("APP_ENV") or "dev"
     AUTO_SEED: bool = (os.getenv("AUTO_SEED", "true").lower() in ("true", "1", "yes"))
-    LLM_MODEL: str = os.getenv("LLM_MODEL") or "gemini-2.5-flash"
+    LLM_MODEL: str = os.getenv("LLM_MODEL") or "openai/gpt-oss-20b"
+    LLM_ENABLED: bool = (os.getenv("LLM_ENABLED", "true").lower() in ("true", "1", "yes"))
+    LLM_TIMEOUT_SECONDS: int = int(os.getenv("LLM_TIMEOUT_SECONDS") or "10")
+    DEMO_TELEGRAM_CHAT_ID: str = os.getenv("DEMO_TELEGRAM_CHAT_ID") or ""
     WEATHER_CACHE_DIR: str = os.getenv("WEATHER_CACHE_DIR") or "data/weather_cache"
     WEATHER_TIMEOUT_SECONDS: int = int(os.getenv("WEATHER_TIMEOUT_SECONDS") or "8")
 

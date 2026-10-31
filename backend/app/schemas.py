@@ -31,6 +31,7 @@ class RegionRead(BaseModel):
     vulnerability: float
     risk_level: str
     rainfall_mm: float
+    is_flooded: bool = False
     is_simulated_flood: bool
 
 
@@ -110,17 +111,38 @@ class RequestRead(BaseModel):
 
 
 # Alert Schemas
+class DeliveryRead(BaseModel):
+    """Response schema for an alert delivery attempt."""
+
+    channel: str
+    status: str
+    recipient: Optional[str] = None
+    detail: Optional[str] = None
+    sent_at: Optional[str] = None
+
+
 class AlertRead(BaseModel):
-    """Response schema for a citizen flood alert."""
+    """Response schema for a flood alert message."""
 
     id: int
     region_id: int
     region_name: str
     level: str
+    level_label: str
     message: str
     status: str
+    requires_approval: bool
     approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
     created_at: str
+    deliveries: list[DeliveryRead] = []
+
+
+class AlertApproveRequest(BaseModel):
+    """Payload schema for approving a draft alert."""
+
+    approved_by: str = "coordinator"
+    message: Optional[str] = None
 
 
 # Subscription Schemas
@@ -187,3 +209,46 @@ class RiskReport(BaseModel):
     action: str
     generated_at: datetime
     simulated: bool = True
+
+
+# Simulation Schemas
+class SimulationHighestRisk(BaseModel):
+    """Highest risk summary details across all monitored regions."""
+
+    region_id: int
+    region: str
+    risk_level: str
+
+
+class SimulationRegionStat(BaseModel):
+    """Region summary metrics within simulation state."""
+
+    id: int
+    name: str
+    risk_level: str
+    rainfall_mm: float
+    is_flooded: bool
+
+
+class SimulationStats(BaseModel):
+    """Aggregated operational metrics for the active simulation stage."""
+
+    highest_risk: Optional[SimulationHighestRisk] = None
+    regions: list[SimulationRegionStat]
+    open_requests: int
+    pending_alerts: int
+    sent_alerts: int
+    stock_remaining_pct: float
+
+
+class SimulationStateRead(BaseModel):
+    """Current state and execution status of the flood scenario simulation."""
+
+    stage: int
+    total_stages: int = 5
+    name: str
+    description: str
+    can_advance: bool
+    label: str = "Illustrative simulation, not a live emergency feed."
+    stats: SimulationStats
+    events: list[str] = Field(default_factory=list)

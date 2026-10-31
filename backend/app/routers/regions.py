@@ -26,6 +26,7 @@ def list_regions(session: Session = Depends(get_session)) -> list[RegionRead]:
             vulnerability=r.vulnerability,
             risk_level=r.risk_level,
             rainfall_mm=r.rainfall_mm,
+            is_flooded=r.is_flooded,
             is_simulated_flood=r.is_simulated_flood,
         )
         for r in regions

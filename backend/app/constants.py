@@ -26,6 +26,7 @@ class AlertStatus(str, Enum):
     DRAFT = "draft"
     APPROVED = "approved"
     SENT = "sent"
+    SUPERSEDED = "superseded"
 
 
 class RequestStatus(str, Enum):

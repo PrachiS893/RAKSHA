@@ -13,6 +13,7 @@ from app.routers.dev import router as dev_router
 from app.routers.health import router as health_router
 from app.routers.regions import router as regions_router
 from app.routers.requests import router as requests_router
+from app.routers.simulation import router as simulation_router
 from app.routers.subscriptions import router as subscriptions_router
 from app.routers.warehouses import router as warehouses_router
 from app.seed import seed_database
@@ -59,6 +60,7 @@ app.include_router(regions_router)
 app.include_router(warehouses_router)
 app.include_router(requests_router)
 app.include_router(alerts_router)
+app.include_router(simulation_router)
 app.include_router(subscriptions_router)
 
 # Dev-only verification endpoints (only mounted in dev mode)
