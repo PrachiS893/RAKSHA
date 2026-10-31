@@ -5,13 +5,46 @@ from fastapi import APIRouter, Depends, Query, status
 from shapely.geometry import Point, shape
 from sqlalchemy import nulls_last
 from sqlmodel import Session, select
+from app.config import settings
 from app.constants import RequestStatus
 from app.db import get_session
 from app.models import Region, Request
-from app.schemas import RequestCreate, RequestRead, format_iso_utc
+from app.schemas import RequestCreate, RequestRead, ScoreFactorBreakdown, format_iso_utc
 from app.services.request_intake import create_request as intake_create_request
 
 router = APIRouter(prefix="/requests", tags=["Requests"])
+
+
+def _to_request_read(req: Request, region_name: Optional[str] = None) -> RequestRead:
+    """Format database Request model to additive RequestRead schema."""
+    breakdown_models = None
+    if req.score_breakdown:
+        breakdown_models = [
+            ScoreFactorBreakdown(**b) if isinstance(b, dict) else b
+            for b in req.score_breakdown
+        ]
+
+    return RequestRead(
+        id=req.id if req.id is not None else 0,
+        ref=f"R{req.id}",
+        text=req.text,
+        name=req.name,
+        lat=req.lat,
+        lon=req.lon,
+        region_id=req.region_id,
+        region_name=region_name,
+        status=req.status,
+        resource_needed=req.resource_needed,
+        people_count=req.people_count,
+        urgency=req.urgency,
+        priority_score=req.priority_score,
+        reason=req.reason,
+        need_summary=req.need_summary,
+        triage_source=req.triage_source,
+        needs_review=req.needs_review,
+        score_breakdown=breakdown_models,
+        created_at=format_iso_utc(req.created_at),
+    )
 
 
 @router.get(
@@ -42,22 +75,7 @@ def list_requests(
     requests = session.exec(query).all()
 
     return [
-        RequestRead(
-            id=req.id,
-            text=req.text,
-            name=req.name,
-            lat=req.lat,
-            lon=req.lon,
-            region_id=req.region_id,
-            region_name=region_map.get(req.region_id) if req.region_id else None,
-            status=req.status,
-            resource_needed=req.resource_needed,
-            people_count=req.people_count,
-            urgency=req.urgency,
-            priority_score=req.priority_score,
-            reason=req.reason,
-            created_at=format_iso_utc(req.created_at),
-        )
+        _to_request_read(req, region_map.get(req.region_id) if req.region_id else None)
         for req in requests
     ]
 
@@ -75,6 +93,7 @@ def create_request(
     """Submit a citizen emergency request.
 
     Determines regional flood zone using Shapely point-in-polygon check.
+    Triages on submit if TRIAGE_ON_SUBMIT is enabled.
     """
     db_request = intake_create_request(
         session=session,
@@ -82,6 +101,7 @@ def create_request(
         lat=payload.lat,
         lon=payload.lon,
         name=payload.name,
+        triage=settings.TRIAGE_ON_SUBMIT,
     )
 
     region_name: Optional[str] = None
@@ -90,19 +110,4 @@ def create_request(
         if region is not None:
             region_name = region.name
 
-    return RequestRead(
-        id=db_request.id,
-        text=db_request.text,
-        name=db_request.name,
-        lat=db_request.lat,
-        lon=db_request.lon,
-        region_id=db_request.region_id,
-        region_name=region_name,
-        status=db_request.status,
-        resource_needed=db_request.resource_needed,
-        people_count=db_request.people_count,
-        urgency=db_request.urgency,
-        priority_score=db_request.priority_score,
-        reason=db_request.reason,
-        created_at=format_iso_utc(db_request.created_at),
-    )
+    return _to_request_read(db_request, region_name)

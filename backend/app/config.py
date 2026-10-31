@@ -25,8 +25,14 @@ class Settings:
     LLM_ENABLED: bool = (os.getenv("LLM_ENABLED", "true").lower() in ("true", "1", "yes"))
     LLM_TIMEOUT_SECONDS: int = int(os.getenv("LLM_TIMEOUT_SECONDS") or "10")
     DEMO_TELEGRAM_CHAT_ID: str = os.getenv("DEMO_TELEGRAM_CHAT_ID") or ""
+    TRIAGE_ON_SUBMIT: bool = (os.getenv("TRIAGE_ON_SUBMIT", "true").lower() in ("true", "1", "yes"))
     WEATHER_CACHE_DIR: str = os.getenv("WEATHER_CACHE_DIR") or "data/weather_cache"
     WEATHER_TIMEOUT_SECONDS: int = int(os.getenv("WEATHER_TIMEOUT_SECONDS") or "8")
+    ROUTING_ENABLED: bool = (os.getenv("ROUTING_ENABLED", "true").lower() in ("true", "1", "yes"))
+    ROUTING_PROFILE: str = os.getenv("ROUTING_PROFILE") or "driving-car"
+    ROUTING_TIMEOUT_SECONDS: int = int(os.getenv("ROUTING_TIMEOUT_SECONDS") or "6")
+    ROUTE_CACHE_DIR: str = os.getenv("ROUTE_CACHE_DIR") or "data/route_cache"
+    OSRM_BASE_URL: str = os.getenv("OSRM_BASE_URL") or "https://router.project-osrm.org"
 
 
 settings: Settings = Settings()

@@ -14,6 +14,7 @@ DEMO_REGIONS: list[dict[str, Any]] = [
         "risk_level": RiskLevel.LOW.value,
         "rainfall_mm": 0.0,
         "is_simulated_flood": True,
+        "households_estimate": 400,
         "polygon": {
             "type": "Polygon",
             "coordinates": [
@@ -35,6 +36,7 @@ DEMO_REGIONS: list[dict[str, Any]] = [
         "risk_level": RiskLevel.LOW.value,
         "rainfall_mm": 0.0,
         "is_simulated_flood": True,
+        "households_estimate": 600,
         "polygon": {
             "type": "Polygon",
             "coordinates": [
@@ -56,6 +58,7 @@ DEMO_REGIONS: list[dict[str, Any]] = [
         "risk_level": RiskLevel.LOW.value,
         "rainfall_mm": 0.0,
         "is_simulated_flood": True,
+        "households_estimate": 300,
         "polygon": {
             "type": "Polygon",
             "coordinates": [
@@ -191,4 +194,44 @@ STAGE_RAINFALL: dict[int, dict[str, float]] = {
 FLOODED_ZONES_STAGE_3: list[str] = [
     "Zone A - Riverside",
     "Zone B - Central Lowlands",
+]
+
+# Simulated hazard zones for routing avoidance (small localized obstacle boxes)
+HAZARD_ZONES: list[dict[str, Any]] = [
+    {
+        "name": "Flooded underpass - north approach",
+        "description": "Severe localized waterlogging blocking the underpass on the north arterial road.",
+        "polygon": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [91.738, 26.193],
+                    [91.744, 26.193],
+                    [91.744, 26.198],
+                    [91.738, 26.198],
+                    [91.738, 26.193],
+                ]
+            ],
+        },
+        "active": False,
+        "simulated": True,
+    },
+    {
+        "name": "River overflow - south approach",
+        "description": "River surge overflowing low-lying roadway on the southern corridor.",
+        "polygon": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [91.741, 26.113],
+                    [91.747, 26.113],
+                    [91.747, 26.118],
+                    [91.741, 26.118],
+                    [91.741, 26.113],
+                ]
+            ],
+        },
+        "active": False,
+        "simulated": True,
+    },
 ]

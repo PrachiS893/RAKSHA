@@ -20,6 +20,18 @@ class Region(SQLModel, table=True):
     rainfall_mm: float = Field(default=0.0)
     is_flooded: bool = Field(default=False)
     is_simulated_flood: bool = Field(default=True)
+    households_estimate: int = Field(default=0)
+
+
+class HazardZone(SQLModel, table=True):
+    """Simulated hazard zone (e.g. flooded underpass, river surge) to avoid during route planning."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    description: str
+    polygon: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
+    active: bool = Field(default=False)
+    simulated: bool = Field(default=True)
 
 
 class Warehouse(SQLModel, table=True):
@@ -56,6 +68,12 @@ class Request(SQLModel, table=True):
     urgency: Optional[str] = Field(default=None, nullable=True)
     priority_score: Optional[int] = Field(default=None, nullable=True)
     reason: Optional[str] = Field(default=None, nullable=True)
+    need_summary: Optional[str] = Field(default=None, nullable=True)
+    triage_source: Optional[str] = Field(default=None, nullable=True)
+    needs_review: bool = Field(default=False)
+    score_breakdown: Optional[list[dict[str, Any]]] = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False),
@@ -70,8 +88,22 @@ class Assignment(SQLModel, table=True):
     warehouse_id: int = Field(foreign_key="warehouse.id")
     resource: str
     quantity: int
+    distance_km: Optional[float] = Field(default=None, nullable=True)
+    partial: bool = Field(default=False)
+    unmet_quantity: int = Field(default=0)
+    reason: Optional[str] = Field(default=None, nullable=True)
     route: Optional[dict[str, Any]] = Field(default=None, sa_column=Column(JSON, nullable=True))
+    approval_required: bool = Field(default=True)
     approved: bool = Field(default=False)
+    approved_by: Optional[str] = Field(default=None, nullable=True)
+    approved_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
 
 class Alert(SQLModel, table=True):

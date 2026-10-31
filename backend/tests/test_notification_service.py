@@ -16,35 +16,6 @@ from app.services import alert_drafting
 from app.services.notification import create_alert_from_report
 
 
-@pytest.fixture(name="client_and_session")
-def client_and_session_fixture(
-    monkeypatch: pytest.MonkeyPatch,
-) -> Generator[tuple[TestClient, Session], None, None]:
-    """Provide TestClient and direct Session on an in-memory SQLite database."""
-    test_engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    SQLModel.metadata.create_all(test_engine)
-
-    with Session(test_engine) as session:
-        seed_database(session)
-
-    def get_test_session() -> Generator[Session, None, None]:
-        with Session(test_engine) as session:
-            yield session
-
-    app.dependency_overrides[get_session] = get_test_session
-
-    # Default LLM to template text in tests
-    monkeypatch.setattr(alert_drafting, "generate_json", lambda prompt, schema, system=None: None)
-
-    with TestClient(app) as test_client:
-        with Session(test_engine) as db_session:
-            yield test_client, db_session
-
-    app.dependency_overrides.clear()
 
 
 def test_moderate_report_auto_sent_and_appears_in_citizen_feed(

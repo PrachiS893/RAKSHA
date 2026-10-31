@@ -1,13 +1,16 @@
 """Shared citizen emergency request intake service.
 
-Provides reusable request persistence with automated geographical region detection.
+Provides reusable request persistence with automated geographical region detection and optional triage.
 """
 
+import logging
 from typing import Optional
 from shapely.geometry import Point, shape
 from sqlmodel import Session, select
 from app.constants import RequestStatus
 from app.models import Region, Request
+
+logger = logging.getLogger(__name__)
 
 
 def create_request(
@@ -16,11 +19,12 @@ def create_request(
     lat: float,
     lon: float,
     name: Optional[str] = None,
+    triage: bool = True,
 ) -> Request:
     """Create and persist a new emergency relief request with automated region detection.
 
     Determines regional flood zone using Shapely point-in-polygon check.
-    AI fields remain null until triage is executed.
+    If triage is True, automatically invokes the Triage Agent to score and prioritize.
     """
     regions = session.exec(select(Region)).all()
     target_region_id: Optional[int] = None
@@ -46,12 +50,25 @@ def create_request(
         urgency=None,
         priority_score=None,
         reason=None,
+        need_summary=None,
+        triage_source=None,
+        needs_review=False,
+        score_breakdown=None,
     )
-
-    # TODO (Step B8): Call Triage Agent here to analyze text and set:
-    # resource_needed, people_count, urgency, priority_score, and reason.
 
     session.add(db_request)
     session.commit()
     session.refresh(db_request)
+
+    if triage:
+        try:
+            from app.agents.triage_agent import run_triage_agent
+
+            run_triage_agent(session=session, request=db_request, persist=True)
+        except Exception as exc:
+            logger.warning(
+                "Automated triage failed on intake (%s); keeping request as received",
+                exc.__class__.__name__,
+            )
+
     return db_request

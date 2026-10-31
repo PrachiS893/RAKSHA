@@ -22,3 +22,4 @@ htmlcov/
 
 # Local data cache
 data/
+data/route_cache/

@@ -25,6 +25,7 @@ from app.models import (
     Alert,
     Assignment,
     Delivery,
+    HazardZone,
     Inventory,
     Region,
     Request,
@@ -134,41 +135,115 @@ def handle_stage_3(session: Session) -> list[str]:
             lat=req_data["lat"],
             lon=req_data["lon"],
             name=req_data.get("name"),
+            triage=False,
         )
     log_agent(session, agent="Orchestrator", message="4 emergency requests received")
+
+    # Activate simulated hazard zones
+    hazards = session.exec(select(HazardZone)).all()
+    for h in hazards:
+        h.active = True
+        session.add(h)
+    session.commit()
+    log_agent(
+        session,
+        agent="Orchestrator",
+        message=f"{len(hazards)} hazard zones now active (simulated)",
+    )
 
     events: list[str] = [
         f"Flooding started in {', '.join(flooded_names)}",
         "Rainfall increased across all monitored zones",
+        f"{len(hazards)} hazard zones now active (simulated)",
         "4 emergency requests received",
     ]
+
+    # Predict shortages under flood scenario
+    from app.services.shortage import predict_shortages
+
+    shortage_data = predict_shortages(session)
+    for res_info in shortage_data["resources"]:
+        if res_info["status"] in ("SHORTAGE", "TIGHT"):
+            r_name = res_info["resource"]
+            stk = res_info["stock"]
+            dem = res_info["predicted_demand"]
+            status_label = res_info["status"]
+            log_agent(
+                session,
+                agent="Relief",
+                message=f"Shortage predicted: {r_name}, stock {stk} vs expected demand {dem}",
+            )
+            events.append(
+                f"Shortage predicted: {r_name} ({status_label}, stock {stk} vs expected demand {dem})"
+            )
+
     return events
 
 
 def on_stage_4(session: Session) -> list[str]:
     """Hook function for Stage 4 (Triage and Allocation).
 
-    TODO (Steps B8/B9):
-      - Step B8: Execute Triage Agent to score and prioritize pending emergency requests.
-      - Step B9: Execute Relief Allocation Agent to assign warehouse inventory to requests.
+    Executes Triage Agent to score and prioritize pending emergency requests,
+    followed by Relief Coordination Agent to propose supply allocations.
     """
-    log_agent(session, agent="Orchestrator", message="Triage and allocation will run here")
-    return ["Triage and allocation will run here (placeholder for steps B8/B9)"]
+    from app.agents.relief_agent import run_relief_agent
+    from app.agents.triage_agent import run_triage_all
+
+    results = run_triage_all(session)
+    events: list[str] = [f"Triage Agent ranked {len(results)} requests"]
+    for i, res in enumerate(results):
+        events.append(f"#{i+1} {res.ref}: {res.urgency.value} ({res.priority_score})")
+
+    plan = run_relief_agent(session, triage_first=False)
+    events.append(
+        f"Relief Agent proposed {len(plan.assignments)} assignments (awaiting coordinator approval)"
+    )
+    for u in plan.unmet:
+        events.append(f"Unmet request {u.request_ref}: {u.resource} ({u.reason})")
+
+    return events
 
 
 def on_stage_5(session: Session) -> list[str]:
     """Hook function for Stage 5 (Routes and Approval).
 
-    TODO (Step B10):
-      - Calculate safe delivery routes avoiding flooded zones.
-      - Present full disaster response plan for human coordinator approval.
+    Calculates safe delivery routes for all assignments avoiding active hazard zones.
     """
+    from app.services.route_planner import compute_routes
+
+    computed = compute_routes(session, force=True)
+    assignments = session.exec(select(Assignment).order_by(Assignment.id)).all()
+
+    events: list[str] = [f"Routes computed for {len(assignments)} assignments"]
+
+    hazard_free_count = sum(1 for a in assignments if a.route and a.route.get("hazard_free"))
+    providers = {
+        a.route.get("provider")
+        for a in assignments
+        if a.route and a.route.get("provider")
+    }
+    provider_str = ", ".join(sorted(providers)) if providers else "none"
+
+    events.append(
+        f"{hazard_free_count} of {len(assignments)} routes avoid all hazard zones ({provider_str})"
+    )
+
+    for a in assignments:
+        if not a.route:
+            continue
+        req_ref = f"R{a.request_id}"
+        if not a.route.get("hazard_free"):
+            warning = a.route.get("warning") or "Route crosses active hazard zone"
+            events.append(f"{req_ref}: {warning}")
+        elif a.route.get("warning"):
+            events.append(f"{req_ref}: {a.route.get('warning')}")
+
     log_agent(
         session,
         agent="Orchestrator",
-        message="Route calculation and final approval plan will run here",
+        message=f"Routes ready for {len(assignments)} assignments ({provider_str})",
     )
-    return ["Route calculation and final approval plan will run here (placeholder for step B10)"]
+    return events
 
 
 def reset(session: Session) -> list[str]:
@@ -197,6 +272,12 @@ def reset(session: Session) -> list[str]:
         r.rainfall_mm = 0.0
         r.is_flooded = False
         session.add(r)
+
+    # Deactivate hazard zones
+    hazards = session.exec(select(HazardZone)).all()
+    for h in hazards:
+        h.active = False
+        session.add(h)
 
     # Set simulation stage back to 1
     sim_state = session.get(SimulationState, 1)
@@ -302,6 +383,12 @@ def get_stats(session: Session) -> dict[str, Any]:
     pending_alerts = sum(1 for a in alerts if a.status == AlertStatus.DRAFT.value)
     sent_alerts = sum(1 for a in alerts if a.status == AlertStatus.SENT.value)
 
+    assignments = session.exec(select(Assignment)).all()
+    assignments_pending = sum(1 for a in assignments if not a.approved)
+
+    hazards = session.exec(select(HazardZone)).all()
+    hazards_active = sum(1 for h in hazards if h.active)
+
     inventory_items = session.exec(select(Inventory)).all()
     total_qty = sum(item.quantity for item in inventory_items)
     total_initial = sum(item.initial_quantity for item in inventory_items)
@@ -317,6 +404,8 @@ def get_stats(session: Session) -> dict[str, Any]:
         "pending_alerts": pending_alerts,
         "sent_alerts": sent_alerts,
         "stock_remaining_pct": stock_remaining_pct,
+        "assignments_pending": assignments_pending,
+        "hazards_active": hazards_active,
     }
 
 
@@ -345,6 +434,8 @@ def get_simulation_state_response(
         pending_alerts=stats_dict["pending_alerts"],
         sent_alerts=stats_dict["sent_alerts"],
         stock_remaining_pct=stats_dict["stock_remaining_pct"],
+        assignments_pending=stats_dict["assignments_pending"],
+        hazards_active=stats_dict["hazards_active"],
     )
 
     return SimulationStateRead(

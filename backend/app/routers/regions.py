@@ -28,6 +28,7 @@ def list_regions(session: Session = Depends(get_session)) -> list[RegionRead]:
             rainfall_mm=r.rainfall_mm,
             is_flooded=r.is_flooded,
             is_simulated_flood=r.is_simulated_flood,
+            households_estimate=r.households_estimate,
         )
         for r in regions
     ]

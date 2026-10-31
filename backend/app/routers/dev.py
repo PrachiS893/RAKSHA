@@ -10,9 +10,20 @@ from app.config import settings
 from app.db import get_session
 from app.models import AgentLog, Region
 from app.routers.alerts import _to_alert_read
-from app.schemas import AlertRead, RiskReport, format_iso_utc
+from app.schemas import (
+    AlertRead,
+    RiskReport,
+    ScoreFactorBreakdown,
+    TriageFeatures,
+    TriagePreviewRequest,
+    TriagePreviewResponse,
+    TriageResult,
+    format_iso_utc,
+)
 from app.services.llm import generate_json
 from app.services.notification import handle_risk_reports
+from app.services.triage_extraction import extract_features, extract_with_rules
+from app.services.triage_scoring import build_reason, calculate_priority
 
 router = APIRouter(prefix="/dev", tags=["Dev (not for frontend)"])
 
@@ -205,3 +216,103 @@ def get_agent_logs(
         )
         for log in logs
     ]
+
+
+@router.post(
+    "/triage-preview",
+    response_model=TriagePreviewResponse,
+    summary="Preview triage extraction and scoring without persisting to database (dev only)",
+)
+def dev_triage_preview(
+    payload: TriagePreviewRequest,
+    session: Session = Depends(get_session),
+) -> TriagePreviewResponse:
+    """Extract structured features and calculate deterministic priority without modifying database state."""
+    from app.constants import RiskLevel
+    from app.schemas import ScoreFactorBreakdown, TriageResult
+
+    try:
+        features, source, needs_review = extract_features(session, payload.text)
+    except Exception:
+        features = extract_with_rules(payload.text)
+        source = "rules"
+        needs_review = True
+
+    region_risk: Optional[RiskLevel] = None
+    if payload.region_id is not None:
+        region = session.get(Region, payload.region_id)
+        if region and region.risk_level:
+            try:
+                region_risk = RiskLevel(region.risk_level)
+            except ValueError:
+                region_risk = None
+
+    priority_score, urgency, breakdown_dicts = calculate_priority(features, region_risk)
+    reason = build_reason(breakdown_dicts, features, region_risk)
+    breakdown_models = [ScoreFactorBreakdown(**b) for b in breakdown_dicts]
+
+    result = TriageResult(
+        request_id=0,
+        ref="R0",
+        urgency=urgency,
+        priority_score=priority_score,
+        reason=reason,
+        resource_needed=features.resource_needed,
+        people_count=features.people_count,
+        need_summary=features.need_summary,
+        source=source,
+        needs_review=needs_review,
+        breakdown=breakdown_models,
+    )
+    return TriagePreviewResponse(result=result, features=features)
+
+
+@router.post(
+    "/route-test",
+    summary="Test route calculation without persisting (dev only)",
+)
+def dev_route_test(
+    warehouse_id: int = Query(...),
+    lat: float = Query(...),
+    lon: float = Query(...),
+    use_hazards: bool = Query(default=True),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Calculate and return a test route between a warehouse and destination coordinates without storing."""
+    from app.models import HazardZone, Warehouse
+    from app.services.routing import get_route
+
+    wh = session.get(Warehouse, warehouse_id)
+    if not wh:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Warehouse with id {warehouse_id} not found",
+        )
+
+    hazards = session.exec(select(HazardZone)).all()
+    route = get_route(
+        origin=(wh.lat, wh.lon),
+        destination=(lat, lon),
+        hazards=hazards,
+        use_hazards=use_hazards,
+    )
+    return route
+
+
+@router.post(
+    "/hazards/activate",
+    summary="Bulk activate or deactivate all hazard zones (dev only)",
+)
+def dev_hazards_activate(
+    active: bool = Query(...),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Toggle all simulated hazard zones active or inactive for testing."""
+    from app.models import HazardZone
+
+    hazards = session.exec(select(HazardZone)).all()
+    for h in hazards:
+        h.active = active
+        session.add(h)
+    session.commit()
+    return {"updated": len(hazards), "active": active}

@@ -3,12 +3,13 @@
 from sqlmodel import Session, delete, select
 from app.config import settings
 from app.db import create_db_and_tables, engine
-from app.demo_data import DEMO_REGIONS, DEMO_SUBSCRIPTIONS, DEMO_WAREHOUSES
+from app.demo_data import DEMO_REGIONS, DEMO_SUBSCRIPTIONS, DEMO_WAREHOUSES, HAZARD_ZONES
 from app.models import (
     AgentLog,
     Alert,
     Assignment,
     Delivery,
+    HazardZone,
     Inventory,
     Region,
     Request,
@@ -33,6 +34,7 @@ def seed_database(session: Session) -> dict[str, int]:
     session.exec(delete(AgentLog))
     session.exec(delete(SimulationState))
     session.exec(delete(Warehouse))
+    session.exec(delete(HazardZone))
     session.exec(delete(Region))
     session.commit()
 
@@ -49,6 +51,7 @@ def seed_database(session: Session) -> dict[str, int]:
             rainfall_mm=r_data["rainfall_mm"],
             is_flooded=False,
             is_simulated_flood=r_data["is_simulated_flood"],
+            households_estimate=r_data.get("households_estimate", 0),
         )
         session.add(region)
         session.flush()
@@ -91,11 +94,23 @@ def seed_database(session: Session) -> dict[str, int]:
     sim_state = SimulationState(id=1, stage=1)
     session.add(sim_state)
 
+    # 5. Insert Hazard Zones (initially inactive)
+    for h_data in HAZARD_ZONES:
+        hazard = HazardZone(
+            name=h_data["name"],
+            description=h_data["description"],
+            polygon=h_data["polygon"],
+            active=False,
+            simulated=h_data.get("simulated", True),
+        )
+        session.add(hazard)
+
     session.commit()
 
     # Calculate row counts
     counts = {
         "regions": len(session.exec(select(Region)).all()),
+        "hazard_zones": len(session.exec(select(HazardZone)).all()),
         "warehouses": len(session.exec(select(Warehouse)).all()),
         "inventory": len(session.exec(select(Inventory)).all()),
         "subscriptions": len(session.exec(select(Subscription)).all()),

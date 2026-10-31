@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
-from app.constants import RiskLevel
+from app.constants import Resource, RiskLevel, Urgency
 
 
 def format_iso_utc(dt: datetime) -> str:
@@ -33,6 +33,7 @@ class RegionRead(BaseModel):
     rainfall_mm: float
     is_flooded: bool = False
     is_simulated_flood: bool
+    households_estimate: int = 0
 
 
 # Warehouse Schemas
@@ -91,10 +92,19 @@ class RequestCreate(BaseModel):
         return v
 
 
+class ScoreFactorBreakdown(BaseModel):
+    """Breakdown component contributing to priority score."""
+
+    factor: str
+    points: int
+    detail: str
+
+
 class RequestRead(BaseModel):
     """Response schema for an emergency request."""
 
     id: int
+    ref: str
     text: str
     name: Optional[str] = None
     lat: float
@@ -107,6 +117,10 @@ class RequestRead(BaseModel):
     urgency: Optional[str] = None
     priority_score: Optional[int] = None
     reason: Optional[str] = None
+    need_summary: Optional[str] = None
+    triage_source: Optional[str] = None
+    needs_review: bool = False
+    score_breakdown: Optional[list[ScoreFactorBreakdown]] = None
     created_at: str
 
 
@@ -238,6 +252,8 @@ class SimulationStats(BaseModel):
     open_requests: int
     pending_alerts: int
     sent_alerts: int
+    assignments_pending: int = 0
+    hazards_active: int = 0
     stock_remaining_pct: float
 
 
@@ -252,3 +268,178 @@ class SimulationStateRead(BaseModel):
     label: str = "Illustrative simulation, not a live emergency feed."
     stats: SimulationStats
     events: list[str] = Field(default_factory=list)
+
+
+# Triage Schemas
+class TriageFeatures(BaseModel):
+    """Extracted objective factual features from a citizen's distress message."""
+
+    resource_needed: Optional[Resource] = None
+    people_count: Optional[int] = Field(default=None, ge=1, le=1000)
+    life_threatening: bool = False
+    life_threat_evidence: Optional[str] = Field(default=None, max_length=100)
+    trapped: bool = False
+    immediate_danger: bool = False
+    medical_dependency: bool = False
+    no_supply_remaining: bool = False
+    elderly: bool = False
+    children: bool = False
+    disabled_or_immobile: bool = False
+    need_summary: str = Field(..., max_length=100)
+
+
+class TriageResult(BaseModel):
+    """Comprehensive triage decision support result produced by the Triage Agent."""
+
+    request_id: int
+    ref: str
+    urgency: Urgency
+    priority_score: int
+    reason: str
+    resource_needed: Optional[Resource] = None
+    people_count: Optional[int] = None
+    need_summary: str
+    source: str  # "llm" | "rules"
+    needs_review: bool
+    breakdown: list[ScoreFactorBreakdown]
+
+
+class TriageRunResponse(BaseModel):
+    """Response schema for running triage across multiple requests."""
+
+    triaged: int
+    ranked: list[TriageResult]
+
+
+class TriagePreviewRequest(BaseModel):
+    """Payload schema for testing triage extraction and scoring in dev mode."""
+
+    text: str
+    region_id: Optional[int] = None
+
+
+class TriagePreviewResponse(BaseModel):
+    """Response schema for dev triage preview."""
+
+    result: TriageResult
+    features: TriageFeatures
+
+
+# Shortage Prediction Schemas
+class RegionDemand(BaseModel):
+    """Regional breakdown of predicted supply demand."""
+
+    region_id: int
+    region: str
+    demand: float
+
+
+class ResourceShortage(BaseModel):
+    """Predicted inventory adequacy and shortfall metrics for an essential resource."""
+
+    resource: str
+    unit: str
+    stock: int
+    predicted_demand: int
+    shortfall: int
+    status: str  # "SHORTAGE" | "TIGHT" | "OK"
+    by_region: list[RegionDemand]
+
+
+class ShortagesResponse(BaseModel):
+    """Response schema for resource shortage prediction."""
+
+    as_of: str
+    simulated: bool = True
+    assumptions: str = (
+        "Illustrative planning assumptions for the demo, not a real forecast."
+    )
+    resources: list[ResourceShortage]
+
+
+# Relief Assignment & Plan Schemas
+class AssignmentRead(BaseModel):
+    """Response schema for a recommended or approved warehouse-to-request supply assignment."""
+
+    id: int
+    request_id: int
+    request_ref: str
+    region_name: Optional[str] = None
+    priority_score: Optional[int] = None
+    urgency: Optional[str] = None
+    resource: str
+    unit: str
+    quantity: int
+    warehouse_id: int
+    warehouse: str
+    distance_km: Optional[float] = None
+    partial: bool = False
+    unmet_quantity: int = 0
+    reason: Optional[str] = None
+    route: Optional[dict[str, Any]] = None
+    approval_required: bool = True
+    approved: bool = False
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
+    request_status: str
+
+
+class AssignmentApproveRequest(BaseModel):
+    """Payload schema for coordinator approval of relief allocations."""
+
+    approved_by: str = "coordinator"
+
+
+class UnmetRequestItem(BaseModel):
+    """Distress request item that could not be fully allocated due to stock depletion or missing info."""
+
+    request_id: int
+    request_ref: str
+    resource: Optional[str] = None
+    quantity_needed: int
+    reason: str
+
+
+class ReliefPlanSummary(BaseModel):
+    """Aggregate statistics for a proposed or approved relief allocation plan."""
+
+    requests_considered: int
+    assigned: int
+    partial: int
+    unmet: int
+    awaiting_approval: int
+    approved: int
+
+
+class ReliefPlan(BaseModel):
+    """Complete relief allocation plan matching warehouse stockpiles to prioritized distress requests."""
+
+    generated_at: str
+    summary: ReliefPlanSummary
+    assignments: list[AssignmentRead]
+    unmet: list[UnmetRequestItem]
+
+
+class PlanApproveResponse(BaseModel):
+    """Response schema after approving a full relief plan."""
+
+    approved: int
+    assignments: list[AssignmentRead]
+
+
+class HazardZoneRead(BaseModel):
+    """Simulated hazard zone geometry and status."""
+
+    id: int
+    name: str
+    description: str
+    polygon: dict[str, Any]
+    active: bool
+    simulated: bool = True
+
+
+class RoutesComputeResponse(BaseModel):
+    """Response schema for batch relief routes computation."""
+
+    computed: int
+    assignments: list[AssignmentRead]

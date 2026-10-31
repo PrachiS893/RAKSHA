@@ -4,7 +4,7 @@ from collections.abc import Generator
 import pytest
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
-from app.models import Inventory, Region, Request, Subscription, Warehouse
+from app.models import HazardZone, Inventory, Region, Request, Subscription, Warehouse
 from app.seed import seed_database
 
 
@@ -26,6 +26,7 @@ def test_seed_database_counts_and_idempotency(session: Session) -> None:
     # First seed execution
     first_counts = seed_database(session)
     assert first_counts["regions"] == 3
+    assert first_counts["hazard_zones"] == 2
     assert first_counts["warehouses"] == 3
     assert first_counts["inventory"] == 12
     assert first_counts["subscriptions"] == 4
@@ -33,12 +34,14 @@ def test_seed_database_counts_and_idempotency(session: Session) -> None:
 
     # Verify directly via queries
     regions = session.exec(select(Region)).all()
+    hazards = session.exec(select(HazardZone)).all()
     warehouses = session.exec(select(Warehouse)).all()
     inventory = session.exec(select(Inventory)).all()
     subscriptions = session.exec(select(Subscription)).all()
     requests = session.exec(select(Request)).all()
 
     assert len(regions) == 3
+    assert len(hazards) == 2
     assert len(warehouses) == 3
     assert len(inventory) == 12
     assert len(subscriptions) == 4
@@ -51,6 +54,7 @@ def test_seed_database_counts_and_idempotency(session: Session) -> None:
     # Second seed execution (idempotency check)
     second_counts = seed_database(session)
     assert second_counts["regions"] == 3
+    assert second_counts["hazard_zones"] == 2
     assert second_counts["warehouses"] == 3
     assert second_counts["inventory"] == 12
     assert second_counts["subscriptions"] == 4

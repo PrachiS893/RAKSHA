@@ -92,13 +92,10 @@ def test_create_request_inside_zone(client: TestClient) -> None:
     assert response.status_code == 201
     data = response.json()
 
-    assert data["status"] == "received"
+    assert data["status"] in ("received", "prioritized")
     assert data["name"] == "Amit"
     assert data["region_name"] == "Zone A - Riverside"
     assert data["region_id"] is not None
-    assert data["resource_needed"] is None
-    assert data["urgency"] is None
-    assert data["priority_score"] is None
     assert "created_at" in data
 
 
@@ -115,7 +112,7 @@ def test_create_request_outside_zones(client: TestClient) -> None:
     assert response.status_code == 201
     data = response.json()
 
-    assert data["status"] == "received"
+    assert data["status"] in ("received", "prioritized")
     assert data["region_id"] is None
     assert data["region_name"] is None
 
