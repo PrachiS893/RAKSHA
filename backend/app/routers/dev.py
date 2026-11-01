@@ -11,6 +11,7 @@ from app.db import get_session
 from app.models import AgentLog, Region
 from app.routers.alerts import _to_alert_read
 from app.schemas import (
+    AgentLogRead,
     AlertRead,
     RiskReport,
     ScoreFactorBreakdown,
@@ -26,16 +27,6 @@ from app.services.triage_extraction import extract_features, extract_with_rules
 from app.services.triage_scoring import build_reason, calculate_priority
 
 router = APIRouter(prefix="/dev", tags=["Dev (not for frontend)"])
-
-
-class AgentLogRead(BaseModel):
-    """Response schema for agent execution audit logs."""
-
-    id: int
-    agent: str
-    message: str
-    payload: Optional[dict[str, Any]] = None
-    created_at: str
 
 
 class TelegramTestResponse(BaseModel):

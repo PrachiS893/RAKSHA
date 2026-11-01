@@ -25,6 +25,7 @@ os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["WEATHER_CACHE_DIR"] = str(_test_weather_cache)
 os.environ["ROUTE_CACHE_DIR"] = str(_test_route_cache)
 os.environ["ROUTING_ENABLED"] = "true"
+os.environ["RISK_CHECK_INTERVAL_MINUTES"] = "0"
 
 
 @pytest.fixture(autouse=True)
@@ -80,6 +81,10 @@ def client_and_session_fixture(
             yield session
 
     app.dependency_overrides[get_session] = get_test_session
+    monkeypatch.setattr("app.db.engine", test_engine)
+    monkeypatch.setattr("app.routers.events.engine", test_engine)
+    monkeypatch.setattr("app.services.scheduler.engine", test_engine)
+
 
     # Prevent external LLM or weather calls during tests
     monkeypatch.setattr(alert_drafting, "generate_json", lambda prompt, schema, system=None: None)

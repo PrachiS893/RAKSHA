@@ -1055,3 +1055,164 @@ When `APP_ENV=dev`, additional development verification routes are mounted under
 - `POST /dev/route-test`: Tests routing between warehouse and coordinates or arbitrary start/end points without modifying assignments.
 - `POST /dev/hazards/activate?active=<bool>`: Toggles active status of all simulated hazard zones.
 - `GET /dev/agent-logs?limit=20`: Returns recent audit logs created by agents (`agent_logs` table).
+
+---
+
+## 11. Live Events Stream & Agent Activity
+
+### `GET /events/stream`
+Server-Sent Events (SSE) live feed delivering real-time agent audit logs and simulation stage transitions. Designed for the coordinator frontend dashboard.
+
+#### Query Parameters
+- `after_id` (*integer*, optional): Resume log stream after this ID (in streaming mode, defaults to latest ID so only new events are emitted; in `once` mode, defaults to `0`).
+- `once` (*boolean*, optional, default `false`): When `true`, flushes existing backlog after `after_id` and terminates the stream immediately (useful for testing and curl).
+
+#### Headers
+- `Last-Event-ID` (*string*, optional): Standard W3C SSE reconnection header. When supplied by the browser, it overrides `after_id` to guarantee zero-loss stream recovery across network drops.
+
+#### Response Headers
+```http
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+X-Accel-Buffering: no
+```
+
+#### Event Message Formats
+
+1. **`event: stage`** (Emitted once upon connection and whenever simulation stage changes):
+```text
+event: stage
+data: {"stage":2,"total_stages":5,"name":"Heavy rainfall forecast","description":"Heavy monsoon rains over the Brahmaputra basin.","can_advance":true,"label":"Illustrative simulation, not a live emergency feed.","stats":{"highest_risk":{"region_id":1,"region":"Zone A - Bharalumukh","risk_level":"HIGH"},"regions":[{"id":1,"name":"Zone A - Bharalumukh","risk_level":"HIGH","rainfall_mm":65.0,"is_flooded":false},{"id":2,"name":"Zone B - Beltola","risk_level":"HIGH","rainfall_mm":55.0,"is_flooded":false},{"id":3,"name":"Zone C - Noonmati","risk_level":"LOW","rainfall_mm":10.0,"is_flooded":false}],"open_requests":0,"pending_alerts":2,"sent_alerts":0,"stock_remaining_pct":100.0,"assignments_pending":0,"hazards_active":0},"events":["Zone A - Bharalumukh risk is now HIGH","Warning drafted for Zone A - Bharalumukh, awaiting approval"]}
+
+```
+
+2. **`event: log`** (Emitted in real-time as agents perform work):
+```text
+id: 42
+event: log
+data: {"id":42,"agent":"Orchestrator","message":"Passing 2 high-risk regions to Notification Service","payload":null,"created_at":"2026-11-01T01:30:00Z"}
+
+```
+
+3. **Keep-Alive Heartbeat** (Emitted every 15 seconds of inactivity):
+```text
+: keep-alive
+
+```
+
+4. **`event: reset`** (Emitted if `after_id` or `Last-Event-ID` is greater than the highest existing log ID, indicating database recreation):
+```text
+event: reset
+data: {}
+
+```
+
+#### Frontend JavaScript Integration Example
+```javascript
+// Open continuous SSE live stream
+const evtSource = new EventSource("http://127.0.0.1:8000/events/stream");
+
+// Listen for database recreation/reset
+evtSource.addEventListener("reset", () => {
+  console.log("Database reset detected, clearing local log buffer.");
+});
+
+// Listen for agent execution logs
+evtSource.addEventListener("log", (e) => {
+  const log = JSON.parse(e.data);
+  console.log(`[${log.agent}] ${log.message} (ID: ${log.id})`);
+  // Update agent activity console in dashboard
+});
+
+
+// Listen for simulation state updates
+evtSource.addEventListener("stage", (e) => {
+  const state = JSON.parse(e.data);
+  console.log(`Simulation Stage ${state.stage}: ${state.name}`);
+  // Update map layer, alert badges, and operational stats
+});
+
+// Automatic reconnection:
+// When connection drops, browser EventSource reconnects automatically and sends
+// the Last-Event-ID header containing the last received log ID.
+evtSource.onerror = (err) => {
+  console.warn("SSE stream disconnected, reconnecting automatically...", err);
+};
+```
+
+---
+
+### `GET /agent-logs`
+Polling endpoint returning agent audit logs ordered ascending by ID (`id > after_id`).
+
+#### Query Parameters
+- `after_id` (*integer*, optional, default `0`): Retrieve only records with `id > after_id`.
+- `limit` (*integer*, optional, default `50`, max `200`): Maximum records to return.
+
+#### Response (`200 OK`)
+```json
+[
+  {
+    "id": 1,
+    "agent": "Risk",
+    "message": "Checking rainfall forecast for Zone A - Bharalumukh",
+    "payload": null,
+    "created_at": "2026-11-01T01:25:00Z"
+  },
+  {
+    "id": 2,
+    "agent": "Orchestrator",
+    "message": "Passing 2 high-risk regions to Notification Service",
+    "payload": null,
+    "created_at": "2026-11-01T01:25:01Z"
+  }
+]
+```
+
+---
+
+### `GET /agents`
+Returns operational health, last active timestamp, newest log message, and total log counts for the 5 fixed autonomous agents and system services.
+
+#### Response (`200 OK`)
+```json
+[
+  {
+    "name": "Risk",
+    "kind": "agent",
+    "last_active": "2026-11-01T01:25:00Z",
+    "last_message": "Zone A - Bharalumukh risk updated to HIGH",
+    "log_count": 8
+  },
+  {
+    "name": "Triage",
+    "kind": "agent",
+    "last_active": "2026-11-01T01:28:10Z",
+    "last_message": "Triage Agent ranked 4 requests",
+    "log_count": 12
+  },
+  {
+    "name": "Relief",
+    "kind": "agent",
+    "last_active": "2026-11-01T01:28:12Z",
+    "last_message": "Shortage predicted: drinking_water, stock 550 vs expected demand 1340",
+    "log_count": 15
+  },
+  {
+    "name": "Orchestrator",
+    "kind": "agent",
+    "last_active": "2026-11-01T01:28:15Z",
+    "last_message": "Routes ready for 4 assignments (ors)",
+    "log_count": 9
+  },
+  {
+    "name": "Notification",
+    "kind": "service",
+    "last_active": "2026-11-01T01:25:05Z",
+    "last_message": "Urgent warning drafted for Zone A - Bharalumukh, awaiting approval",
+    "log_count": 6
+  }
+]
+```
+

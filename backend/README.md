@@ -49,7 +49,7 @@ cp .env.example .env
 The application uses SQLModel with SQLite (`raksha.db`).
 
 > [!IMPORTANT]
-> **Database Recreation Note**: Step B6 added `is_flooded` to `region` and `simulation_state`. Step B7 added `approved_at` to `alert` and `recipient`, `detail` to `delivery`. Step B8 added `need_summary`, `triage_source`, `needs_review`, and `score_breakdown` to `request`. Step B9 added `households_estimate` to `region` and `distance_km`, `partial`, `unmet_quantity`, `reason`, `approval_required`, `approved_by`, `approved_at`, `created_at` to `assignment`. Step B10 adds the `hazard_zone` table and `route` JSON column to `assignment`. To apply schema updates in your development environment, delete `raksha.db` and re-seed:
+> **Database Recreation Note**: Step B6 added `is_flooded` to `region` and `simulation_state`. Step B7 added `approved_at` to `alert` and `recipient`, `detail` to `delivery`. Step B8 added `need_summary`, `triage_source`, `needs_review`, and `score_breakdown` to `request`. Step B9 added `households_estimate` to `region` and `distance_km`, `partial`, `unmet_quantity`, `reason`, `approval_required`, `approved_by`, `approved_at`, `created_at` to `assignment`. Step B10 adds the `hazard_zone` table and `route` JSON column to `assignment`. Step B11 adds `sqlite_autoincrement` to `agent_logs` so IDs are never reused across simulation resets. To apply schema updates in your development environment, delete `raksha.db` and re-seed:
 > ```powershell
 > Remove-Item raksha.db -ErrorAction SilentlyContinue
 > python -m app.seed
@@ -318,6 +318,48 @@ Raksha plans relief delivery routes that connect assigned warehouses to distress
   ```js
   const latLngs = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
   ```
+
+## Orchestrator & Multi-Agent Coordination (B11)
+
+The **Orchestrator** (`app/services/orchestrator.py`) acts as the central conductor for the multi-agent system. Rather than having simulator steps or routers tightly coupled to domain logic, the Orchestrator owns the lifecycle and transitions:
+
+1. **Explicit Handoff Logging**: Every handoff between agents is logged via `log_agent(agent="Orchestrator", ...)` (e.g., *"Passing 2 high-risk regions to Notification Service"*, *"Passing 4 prioritized requests to Relief Agent"*).
+2. **Standardized Return Types**: Every orchestrator action returns a dataclass result containing human-readable `events` alongside domain objects:
+   - `assess_risk()`: Coordinates Risk Agent evaluation, regional flood flags, and alert drafting via the Notification Service.
+   - `predict_supply_shortages()`: Forecasts regional supply deficits under flood conditions.
+   - `submit_request()`: Ingests distress calls and triggers automated triage scoring.
+   - `plan_relief()`: Executes request triage prioritization, warehouse stock allocation, and optional hazard-avoiding delivery routes.
+   - `activate_hazards()`: Dynamically toggles simulated flood hazard zones.
+   - `compute_delivery_routes()`: Generates verified delivery routes avoiding active hazards.
+
+### The 5 System Entities (`GET /agents`)
+
+Raksha tracks exactly five fixed system entities accessible at `GET /agents`:
+
+| Name | Kind | Role |
+|---|---|---|
+| **Risk** | `agent` | Monitors rainfall forecasts and evaluates regional flood risk severity. |
+| **Triage** | `agent` | Extracts situational facts from citizen distress calls and scores urgency. |
+| **Relief** | `agent` | Predicts regional supply shortages and allocates nearest warehouse stockpiles. |
+| **Orchestrator** | `agent` | Coordinates multi-agent handoffs, hazard states, and delivery routing. |
+| **Notification** | `service` | Formats and dispatches citizen advisory and emergency warnings via Telegram. |
+
+### Real-Time Live Stream (`GET /events/stream`)
+
+The backend exposes a high-performance Server-Sent Events (SSE) feed (`text/event-stream`):
+- **`event: stage`**: Emitted once on initial connection and whenever the simulation stage advances, carrying complete simulation stats.
+- **`event: log`**: Emitted live as agents perform work, carrying audit logs (`id`, `agent`, `message`, `payload`, `created_at`).
+- **Resilience**: The browser's native `EventSource` automatically sends the `Last-Event-ID` header upon reconnecting, ensuring no events are dropped during transient network interruptions.
+
+### Periodic Background Risk Check (`RISK_CHECK_INTERVAL_MINUTES`)
+
+- Controlled by `RISK_CHECK_INTERVAL_MINUTES` in `.env` (default: `0`, disabled).
+- When set to `N > 0`, an APScheduler `BackgroundScheduler` starts with the FastAPI application lifespan and invokes `scheduled_risk_check()` every $N$ minutes.
+- **Safety Rule**: The scheduled check only evaluates live weather when the system is idle (simulation at Stage 1 and 0 active requests). If a simulation is in progress, it logs *"Skipped scheduled check: simulation in progress"* and yields.
+
+> [!WARNING]
+> **Demo Best Practice**: Keep `RISK_CHECK_INTERVAL_MINUTES=0` during scripted demo presentations so live external weather feeds do not overwrite the simulated demo scenario stages.
+
 
 ## Development Verification Endpoints (Dev Mode Only)
 

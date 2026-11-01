@@ -152,6 +152,8 @@ class Delivery(SQLModel, table=True):
 class AgentLog(SQLModel, table=True):
     """Audit log entry capturing internal agent decisions and telemetry."""
 
+    __table_args__ = {"sqlite_autoincrement": True}
+
     id: Optional[int] = Field(default=None, primary_key=True)
     agent: str
     message: str

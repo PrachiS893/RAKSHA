@@ -33,6 +33,7 @@ class Settings:
     ROUTING_TIMEOUT_SECONDS: int = int(os.getenv("ROUTING_TIMEOUT_SECONDS") or "6")
     ROUTE_CACHE_DIR: str = os.getenv("ROUTE_CACHE_DIR") or "data/route_cache"
     OSRM_BASE_URL: str = os.getenv("OSRM_BASE_URL") or "https://router.project-osrm.org"
+    RISK_CHECK_INTERVAL_MINUTES: int = int(os.getenv("RISK_CHECK_INTERVAL_MINUTES") or "0")
 
 
 settings: Settings = Settings()

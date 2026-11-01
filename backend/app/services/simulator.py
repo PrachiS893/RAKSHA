@@ -38,10 +38,8 @@ from app.schemas import (
     SimulationStateRead,
     SimulationStats,
 )
+from app.services import orchestrator
 from app.services.agent_log import log_agent
-from app.services.alert_rules import LEVEL_LABELS
-from app.services.notification import handle_risk_reports
-from app.services.request_intake import create_request
 
 logger = logging.getLogger(__name__)
 
@@ -79,62 +77,40 @@ def get_stage_rainfall_by_id(session: Session, stage: int) -> dict[int, float]:
 
 def handle_stage_2(session: Session) -> list[str]:
     """Execute Stage 2: Heavy rainfall forecast.
-    
-    Runs Risk Agent across all regions and drafts/dispatches alerts.
+
+    Runs Risk Agent across all regions and drafts/dispatches alerts via orchestrator.
     """
     override_by_id = get_stage_rainfall_by_id(session, stage=2)
-    reports = run_risk_agent_all(session, override_by_region=override_by_id, persist=True)
-    created_alerts = handle_risk_reports(session, reports)
-
-    events: list[str] = []
-    for report in reports:
-        events.append(f"{report.region} risk is now {report.risk_level.value}")
-
-    for alert in created_alerts:
-        region = session.get(Region, alert.region_id)
-        region_name = region.name if region else f"Region {alert.region_id}"
-        try:
-            lvl_enum = AlertLevel(alert.level)
-            label = LEVEL_LABELS.get(lvl_enum, alert.level)
-        except Exception:
-            label = alert.level
-
-        if alert.status == AlertStatus.SENT.value:
-            events.append(f"{label} sent for {region_name}")
-        else:
-            events.append(f"{label} drafted for {region_name}, awaiting approval")
-
-    return events
+    result = orchestrator.assess_risk(session, overrides=override_by_id)
+    return result.events
 
 
 def handle_stage_3(session: Session) -> list[str]:
     """Execute Stage 3: Flood begins.
 
-    Marks flooded zones, re-runs Risk Agent with increased rain, and intakes 4 emergency requests.
+    Marks flooded zones, re-runs Risk Agent with increased rain, intakes requests,
+    activates hazards, and predicts shortages via orchestrator.
     """
-    flooded_names: list[str] = []
+    events: list[str] = []
     regions = session.exec(select(Region)).all()
-    for r in regions:
-        is_flooded = False
-        for item in FLOODED_ZONES_STAGE_3:
-            full_name = ZONE_CODES.get(item, item)
-            if r.name == item or r.name == full_name or f"Zone {item}" in r.name:
-                is_flooded = True
-                break
-        if is_flooded:
-            r.is_flooded = True
-            flooded_names.append(r.name)
-        else:
-            r.is_flooded = False
-        session.add(r)
-    session.commit()
-
+    flooded_ids = [
+        r.id
+        for r in regions
+        if r.id is not None
+        and any(
+            fz in r.name or r.name in fz or r.name == ZONE_CODES.get(fz)
+            for fz in FLOODED_ZONES_STAGE_3
+        )
+    ]
     override_by_id = get_stage_rainfall_by_id(session, stage=3)
-    reports = run_risk_agent_all(session, override_by_region=override_by_id, persist=True)
-    handle_risk_reports(session, reports)
+    orchestrator.assess_risk(session, overrides=override_by_id, set_flooded=flooded_ids)
+
+    flooded_names = [r.name for r in regions if r.id in flooded_ids]
+    events.append(f"Flooding started in {', '.join(flooded_names)}")
+    events.append("Rainfall increased across all monitored zones")
 
     for req_data in SAMPLE_REQUESTS:
-        create_request(
+        orchestrator.submit_request(
             session=session,
             text=req_data["text"],
             lat=req_data["lat"],
@@ -142,45 +118,18 @@ def handle_stage_3(session: Session) -> list[str]:
             name=req_data.get("name"),
             triage=False,
         )
-    log_agent(session, agent="Orchestrator", message="4 emergency requests received")
-
-    # Activate simulated hazard zones
-    hazards = session.exec(select(HazardZone)).all()
-    for h in hazards:
-        h.active = True
-        session.add(h)
-    session.commit()
     log_agent(
         session,
         agent="Orchestrator",
-        message=f"{len(hazards)} hazard zones now active (simulated)",
+        message=f"{len(SAMPLE_REQUESTS)} emergency requests received",
     )
 
-    events: list[str] = [
-        f"Flooding started in {', '.join(flooded_names)}",
-        "Rainfall increased across all monitored zones",
-        f"{len(hazards)} hazard zones now active (simulated)",
-        "4 emergency requests received",
-    ]
+    haz_res = orchestrator.activate_hazards(session, active=True)
+    events.extend(haz_res.events)
+    events.append("4 emergency requests received")
 
-    # Predict shortages under flood scenario
-    from app.services.shortage import predict_shortages
-
-    shortage_data = predict_shortages(session)
-    for res_info in shortage_data["resources"]:
-        if res_info["status"] in ("SHORTAGE", "TIGHT"):
-            r_name = res_info["resource"]
-            stk = res_info["stock"]
-            dem = res_info["predicted_demand"]
-            status_label = res_info["status"]
-            log_agent(
-                session,
-                agent="Relief",
-                message=f"Shortage predicted: {r_name}, stock {stk} vs expected demand {dem}",
-            )
-            events.append(
-                f"Shortage predicted: {r_name} ({status_label}, stock {stk} vs expected demand {dem})"
-            )
+    shortage_res = orchestrator.predict_supply_shortages(session)
+    events.extend(shortage_res.events)
 
     return events
 
@@ -188,66 +137,19 @@ def handle_stage_3(session: Session) -> list[str]:
 def on_stage_4(session: Session) -> list[str]:
     """Hook function for Stage 4 (Triage and Allocation).
 
-    Executes Triage Agent to score and prioritize pending emergency requests,
-    followed by Relief Coordination Agent to propose supply allocations.
+    Coordinates triage prioritization and supply allocation via orchestrator.
     """
-    from app.agents.relief_agent import run_relief_agent
-    from app.agents.triage_agent import run_triage_all
-
-    results = run_triage_all(session)
-    events: list[str] = [f"Triage Agent ranked {len(results)} requests"]
-    for i, res in enumerate(results):
-        events.append(f"#{i+1} {res.ref}: {res.urgency.value} ({res.priority_score})")
-
-    plan = run_relief_agent(session, triage_first=False)
-    events.append(
-        f"Relief Agent proposed {len(plan.assignments)} assignments (awaiting coordinator approval)"
-    )
-    for u in plan.unmet:
-        events.append(f"Unmet request {u.request_ref}: {u.resource} ({u.reason})")
-
-    return events
+    result = orchestrator.plan_relief(session, with_routes=False)
+    return result.events
 
 
 def on_stage_5(session: Session) -> list[str]:
     """Hook function for Stage 5 (Routes and Approval).
 
-    Calculates safe delivery routes for all assignments avoiding active hazard zones.
+    Calculates safe delivery routes for all assignments via orchestrator.
     """
-    from app.services.route_planner import compute_routes
-
-    computed = compute_routes(session, force=True)
-    assignments = session.exec(select(Assignment).order_by(Assignment.id)).all()
-
-    events: list[str] = [f"Routes computed for {len(assignments)} assignments"]
-
-    hazard_free_count = sum(1 for a in assignments if a.route and a.route.get("hazard_free"))
-    providers = {
-        a.route.get("provider")
-        for a in assignments
-        if a.route and a.route.get("provider")
-    }
-    provider_str = ", ".join(sorted(providers)) if providers else "none"
-
-    events.append(
-        f"{hazard_free_count} of {len(assignments)} routes avoid all hazard zones ({provider_str})"
-    )
-
-    for a in assignments:
-        if not a.route:
-            continue
-        req_ref = f"R{a.request_id}"
-        if not a.route.get("hazard_free"):
-            warning = a.route.get("warning") or "Route crosses active hazard zone"
-            events.append(f"{req_ref}: {warning}")
-        elif a.route.get("warning"):
-            events.append(f"{req_ref}: {a.route.get('warning')}")
-
-    log_agent(
-        session,
-        agent="Orchestrator",
-        message=f"Routes ready for {len(assignments)} assignments ({provider_str})",
-    )
+    result = orchestrator.compute_delivery_routes(session, force=True)
+    return result.events
     return events
 
 

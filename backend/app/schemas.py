@@ -443,3 +443,24 @@ class RoutesComputeResponse(BaseModel):
 
     computed: int
     assignments: list[AssignmentRead]
+
+
+class AgentLogRead(BaseModel):
+    """Response schema for agent execution audit logs."""
+
+    id: int
+    agent: str
+    message: str
+    payload: Optional[dict[str, Any]] = None
+    created_at: str
+
+
+class AgentStatusRead(BaseModel):
+    """Response schema for agent health and status."""
+
+    name: str
+    kind: str  # "agent" | "service"
+    last_active: Optional[str] = None
+    last_message: Optional[str] = None
+    log_count: int
+
